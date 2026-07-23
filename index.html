@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ | QSNCC</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#ffffff; --muted:#64748b; --line:#e2e8f0;
+    --brand:#0d9488; --brand-dark:#0f766e; --brand-soft:#ccfbf1;
+    --ink:#0f172a; --danger:#dc2626; --warn:#d97706; --ok:#16a34a;
+    --shadow:0 1px 3px rgba(15,23,42,.08),0 8px 24px rgba(15,23,42,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Segoe UI",Tahoma,"Sarabun","Noto Sans Thai",sans-serif;
+    background:linear-gradient(180deg,#f1f5f9,#e2e8f0 40%,#f8fafc);
+    color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  header.app{
+    background:linear-gradient(120deg,var(--brand-dark),var(--brand));
+    color:#fff; padding:20px 24px; box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  header.app .logo{
+    width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.18);
+    display:grid;place-items:center;font-size:26px;flex:0 0 auto;
+  }
+  header.app h1{margin:0;font-size:20px;font-weight:700;line-height:1.2}
+  header.app p{margin:2px 0 0;font-size:13px;opacity:.9}
+  header.app .spacer{flex:1}
+  header.app .hdr-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  nav.tabs{
+    display:flex;gap:6px;padding:12px 24px 0;flex-wrap:wrap;
+    background:transparent;
+  }
+  nav.tabs button{
+    border:none;background:#fff;color:var(--muted);cursor:pointer;
+    padding:11px 18px;border-radius:12px 12px 0 0;font-size:15px;font-weight:600;
+    border:1px solid var(--line);border-bottom:none;transition:.15s;
+  }
+  nav.tabs button.active{color:var(--brand-dark);background:#fff;box-shadow:0 -2px 0 var(--brand) inset}
+  nav.tabs button:not(.active):hover{background:#f8fafc}
+
+  main{padding:0 24px 48px}
+  .view{display:none;animation:fade .2s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px;margin-bottom:20px;
+  }
+  .card h2{margin:0 0 4px;font-size:18px}
+  .card .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+
+  /* form */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:13px;font-weight:600;color:#334155}
+  .field label .req{color:var(--danger)}
+  .field input,.field select,.field textarea{
+    padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;
+    font-family:inherit;background:#fff;color:var(--ink);transition:.15s;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);
+  }
+  .field textarea{resize:vertical;min-height:64px}
+
+  .btn{
+    border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;
+    cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px;transition:.15s;
+  }
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-dark)}
+  .btn-ghost{background:#f1f5f9;color:#334155}
+  .btn-ghost:hover{background:#e2e8f0}
+  .btn-danger{background:#fef2f2;color:var(--danger)}
+  .btn-danger:hover{background:#fee2e2}
+  .btn-sm{padding:6px 12px;font-size:13px}
+  .form-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+
+  /* toolbar */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  .toolbar input,.toolbar select{
+    padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;
+  }
+  .toolbar .spacer{flex:1}
+
+  /* table */
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px}
+  thead th{
+    background:#f8fafc;text-align:left;padding:11px 12px;font-weight:700;color:#475569;
+    border-bottom:2px solid var(--line);white-space:nowrap;position:sticky;top:0;
+  }
+  tbody td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:#f8fafc}
+  tbody tr:last-child td{border-bottom:none}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .tag.ok{background:#dcfce7;color:#15803d}
+  .tag.warn{background:#fef3c7;color:#b45309}
+  .row-actions{display:flex;gap:6px;white-space:nowrap}
+  .icon-btn{border:none;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px}
+  .icon-btn:hover{background:#e2e8f0}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+  .stat{
+    background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid var(--line);
+    border-radius:12px;padding:16px 18px;
+  }
+  .stat .label{font-size:13px;color:var(--muted);font-weight:600}
+  .stat .value{font-size:26px;font-weight:800;color:var(--brand-dark);margin-top:4px;line-height:1}
+  .stat .unit{font-size:13px;color:var(--muted);font-weight:600;margin-left:3px}
+
+  /* bar chart */
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .bar-row{display:grid;grid-template-columns:130px 1fr 60px;align-items:center;gap:10px;font-size:13px}
+  .bar-track{background:#f1f5f9;border-radius:8px;height:22px;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-dark));border-radius:8px;min-width:2px;transition:width .4s}
+  .bar-val{text-align:right;font-weight:700;color:#334155}
+
+  .hint{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:16px}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120%);
+    background:var(--ink);color:#fff;padding:13px 22px;border-radius:12px;font-size:14px;
+    box-shadow:var(--shadow);transition:.3s;z-index:99;font-weight:600;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--danger)}
+
+  footer.app{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+
+  @media print{
+    header.app,nav.tabs,.toolbar,.form-actions,.hdr-actions,footer.app,.no-print{display:none!important}
+    body{background:#fff}
+    .view{display:none!important}
+    #print-only{display:block!important}
+    .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid}
+  }
+  #print-only{display:none}
+  @media(max-width:640px){
+    header.app{padding:16px}
+    main{padding:0 12px 40px}
+    nav.tabs{padding:12px 12px 0}
+    .bar-row{grid-template-columns:90px 1fr 48px}
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <div class="logo">🧴</div>
+  <div>
+    <h1>ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ</h1>
+    <p>QSNCC — Disinfection Machine Registry &amp; Reporting</p>
+  </div>
+  <div class="spacer"></div>
+  <div class="hdr-actions">
+    <button class="btn btn-ghost btn-sm" onclick="exportBackup()">⬇️ สำรองข้อมูล</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⬆️ นำเข้า</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)" />
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="record">📝 บันทึกข้อมูล</button>
+  <button class="tab-btn" data-view="list">📋 รายการทั้งหมด</button>
+  <button class="tab-btn" data-view="report">📊 รายงาน</button>
+</nav>
+
+<main>
+  <!-- ============ RECORD ============ -->
+  <section class="view active" id="view-record">
+    <div class="card">
+      <h2 id="formTitle">บันทึกการใช้งานใหม่</h2>
+      <div class="sub">กรอกข้อมูลการปฏิบัติงานพ่นฆ่าเชื้อแต่ละครั้ง — ช่องที่มี <span style="color:var(--danger)">*</span> จำเป็นต้องกรอก</div>
+      <form id="recordForm" onsubmit="saveRecord(event)">
+        <input type="hidden" id="editId" />
+        <div class="grid">
+          <div class="field">
+            <label>วันที่ <span class="req">*</span></label>
+            <input type="date" id="f_date" required />
+          </div>
+          <div class="field">
+            <label>เวลา <span class="req">*</span></label>
+            <input type="time" id="f_time" required />
+          </div>
+          <div class="field">
+            <label>อาคาร / โซน <span class="req">*</span></label>
+            <input type="text" id="f_zone" list="zoneList" placeholder="เช่น Zone A, ชั้น 2" required />
+            <datalist id="zoneList"></datalist>
+          </div>
+          <div class="field">
+            <label>จุด / ห้องที่ปฏิบัติงาน</label>
+            <input type="text" id="f_room" placeholder="เช่น ห้องประชุม 201, โถงต้อนรับ" />
+          </div>
+          <div class="field">
+            <label>หมายเลขเครื่อง <span class="req">*</span></label>
+            <input type="text" id="f_machine" list="machineList" placeholder="เช่น DM-01" required />
+            <datalist id="machineList"></datalist>
+          </div>
+          <div class="field">
+            <label>ผู้ปฏิบัติงาน <span class="req">*</span></label>
+            <input type="text" id="f_operator" list="operatorList" placeholder="ชื่อ-สกุล" required />
+            <datalist id="operatorList"></datalist>
+          </div>
+          <div class="field">
+            <label>น้ำยาฆ่าเชื้อ</label>
+            <input type="text" id="f_chemical" list="chemList" placeholder="เช่น ไฮโปคลอไรต์ 0.5%" />
+            <datalist id="chemList"></datalist>
+          </div>
+          <div class="field">
+            <label>ปริมาณน้ำยา (มล.)</label>
+            <input type="number" id="f_volume" min="0" step="1" placeholder="0" />
+          </div>
+          <div class="field">
+            <label>พื้นที่ที่พ่น (ตร.ม.)</label>
+            <input type="number" id="f_area" min="0" step="0.1" placeholder="0" />
+          </div>
+          <div class="field">
+            <label>ระยะเวลา (นาที)</label>
+            <input type="number" id="f_duration" min="0" step="1" placeholder="0" />
+          </div>
+          <div class="field">
+            <label>ผลการตรวจสอบ</label>
+            <select id="f_result">
+              <option value="ปกติ">ปกติ</option>
+              <option value="พบปัญหา">พบปัญหา</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>หมายเหตุ</label>
+          <textarea id="f_notes" placeholder="รายละเอียดเพิ่มเติม เช่น อาการเครื่อง การบำรุงรักษา ฯลฯ"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">💾 บันทึกข้อมูล</button>
+          <button type="reset" class="btn btn-ghost" onclick="resetForm()">ล้างฟอร์ม</button>
+          <button type="button" class="btn btn-ghost" id="cancelEdit" style="display:none" onclick="resetForm()">ยกเลิกการแก้ไข</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ LIST ============ -->
+  <section class="view" id="view-list">
+    <div class="card">
+      <h2>รายการบันทึกทั้งหมด</h2>
+      <div class="sub">ค้นหา กรอง แก้ไข หรือลบข้อมูลได้จากตารางนี้</div>
+      <div class="toolbar">
+        <input type="text" id="searchBox" placeholder="🔍 ค้นหา (โซน, เครื่อง, ผู้ปฏิบัติงาน...)" oninput="renderList()" style="min-width:240px" />
+        <input type="month" id="filterMonth" onchange="renderList()" />
+        <select id="filterResult" onchange="renderList()">
+          <option value="">ทุกผลตรวจ</option>
+          <option value="ปกติ">ปกติ</option>
+          <option value="พบปัญหา">พบปัญหา</option>
+        </select>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📄 ส่งออก CSV</button>
+        <button class="btn btn-danger btn-sm" onclick="clearFilters()">ล้างตัวกรอง</button>
+      </div>
+      <div class="table-wrap">
+        <table id="listTable">
+          <thead>
+            <tr>
+              <th>วันที่</th><th>เวลา</th><th>โซน / จุด</th><th>เครื่อง</th>
+              <th>ผู้ปฏิบัติงาน</th><th>น้ำยา</th><th>ปริมาณ</th><th>พื้นที่</th>
+              <th>เวลา(น.)</th><th>ผล</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+      <div id="listCount" class="sub" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section class="view" id="view-report">
+    <div class="card">
+      <h2>จัดทำรายงาน</h2>
+      <div class="sub">เลือกประเภทและช่วงเวลาของรายงานที่ต้องการ</div>
+      <div class="toolbar">
+        <div class="field" style="flex-direction:row;align-items:center;gap:8px">
+          <label style="margin:0">ประเภท:</label>
+          <select id="reportType" onchange="onReportTypeChange()">
+            <option value="session">รายครั้ง</option>
+            <option value="month" selected>รายเดือน</option>
+            <option value="quarter">รายไตรมาส</option>
+            <option value="year">รายปี</option>
+          </select>
+        </div>
+        <div class="field" id="wrapYear" style="flex-direction:row;align-items:center;gap:8px">
+          <label style="margin:0">ปี:</label>
+          <select id="reportYear"></select>
+        </div>
+        <div class="field" id="wrapMonth" style="flex-direction:row;align-items:center;gap:8px;display:none">
+          <label style="margin:0">เดือน:</label>
+          <select id="reportMonth"></select>
+        </div>
+        <div class="field" id="wrapQuarter" style="flex-direction:row;align-items:center;gap:8px;display:none">
+          <label style="margin:0">ไตรมาส:</label>
+          <select id="reportQuarter">
+            <option value="1">Q1 (ม.ค.–มี.ค.)</option>
+            <option value="2">Q2 (เม.ย.–มิ.ย.)</option>
+            <option value="3">Q3 (ก.ค.–ก.ย.)</option>
+            <option value="4">Q4 (ต.ค.–ธ.ค.)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="generateReport()">สร้างรายงาน</button>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
+      </div>
+    </div>
+    <div id="reportOutput"></div>
+  </section>
+</main>
+
+<div id="print-only"></div>
+<div class="toast" id="toast"></div>
+<footer class="app">
+  ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ · QSNCC · ข้อมูลถูกจัดเก็บในเบราว์เซอร์ของคุณ (localStorage)
+</footer>
+
+<script>
+/* ============================================================
+   Data layer — persisted in browser localStorage
+   ============================================================ */
+const STORE_KEY = "qsncc_disinfection_records_v1";
+const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
+  "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+const THAI_MONTHS_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+let records = load();
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function persist(){ localStorage.setItem(STORE_KEY, JSON.stringify(records)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function fmt(n){ return (Math.round(n*100)/100).toLocaleString('th-TH'); }
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.className='toast', 2600);
+}
+function thaiDate(iso){
+  if(!iso) return "";
+  const [y,m,d] = iso.split('-');
+  return `${parseInt(d)} ${THAI_MONTHS_SHORT[parseInt(m)-1]} ${parseInt(y)+543}`;
+}
+function quarterOf(month){ return Math.floor((month-1)/3)+1; } // month 1-12
+
+/* ============================================================
+   Tabs
+   ============================================================ */
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('view-'+b.dataset.view).classList.add('active');
+    if(b.dataset.view==='list') renderList();
+    if(b.dataset.view==='report'){ buildReportSelectors(); }
+  };
+});
+
+/* ============================================================
+   Record form
+   ============================================================ */
+function saveRecord(e){
+  e.preventDefault();
+  const rec = {
+    id: document.getElementById('editId').value || uid(),
+    date: document.getElementById('f_date').value,
+    time: document.getElementById('f_time').value,
+    zone: document.getElementById('f_zone').value.trim(),
+    room: document.getElementById('f_room').value.trim(),
+    machine: document.getElementById('f_machine').value.trim(),
+    operator: document.getElementById('f_operator').value.trim(),
+    chemical: document.getElementById('f_chemical').value.trim(),
+    volume: num(document.getElementById('f_volume').value),
+    area: num(document.getElementById('f_area').value),
+    duration: num(document.getElementById('f_duration').value),
+    result: document.getElementById('f_result').value,
+    notes: document.getElementById('f_notes').value.trim(),
+  };
+  const editing = !!document.getElementById('editId').value;
+  if(editing){
+    const i = records.findIndex(r=>r.id===rec.id);
+    if(i>-1) records[i] = rec;
+    toast('แก้ไขข้อมูลเรียบร้อยแล้ว ✓');
+  }else{
+    records.push(rec);
+    toast('บันทึกข้อมูลเรียบร้อยแล้ว ✓');
+  }
+  persist();
+  resetForm();
+  refreshDatalists();
+}
+
+function resetForm(){
+  document.getElementById('recordForm').reset();
+  document.getElementById('editId').value = '';
+  document.getElementById('formTitle').textContent = 'บันทึกการใช้งานใหม่';
+  document.getElementById('cancelEdit').style.display = 'none';
+  // default to today / now
+  const now = new Date();
+  document.getElementById('f_date').value = now.toISOString().slice(0,10);
+  document.getElementById('f_time').value = now.toTimeString().slice(0,5);
+}
+
+function editRecord(id){
+  const r = records.find(x=>x.id===id); if(!r) return;
+  document.getElementById('editId').value = r.id;
+  document.getElementById('f_date').value = r.date;
+  document.getElementById('f_time').value = r.time;
+  document.getElementById('f_zone').value = r.zone;
+  document.getElementById('f_room').value = r.room;
+  document.getElementById('f_machine').value = r.machine;
+  document.getElementById('f_operator').value = r.operator;
+  document.getElementById('f_chemical').value = r.chemical;
+  document.getElementById('f_volume').value = r.volume||'';
+  document.getElementById('f_area').value = r.area||'';
+  document.getElementById('f_duration').value = r.duration||'';
+  document.getElementById('f_result').value = r.result;
+  document.getElementById('f_notes').value = r.notes;
+  document.getElementById('formTitle').textContent = 'แก้ไขข้อมูลการใช้งาน';
+  document.getElementById('cancelEdit').style.display = 'inline-flex';
+  // switch to record tab
+  document.querySelector('.tab-btn[data-view="record"]').click();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteRecord(id){
+  if(!confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) return;
+  records = records.filter(r=>r.id!==id);
+  persist(); renderList(); refreshDatalists();
+  toast('ลบข้อมูลแล้ว');
+}
+
+/* datalists for quick entry */
+function refreshDatalists(){
+  const fill = (id, key)=>{
+    const vals = [...new Set(records.map(r=>r[key]).filter(Boolean))].sort();
+    document.getElementById(id).innerHTML = vals.map(v=>`<option value="${esc(v)}">`).join('');
+  };
+  fill('zoneList','zone'); fill('machineList','machine');
+  fill('operatorList','operator'); fill('chemList','chemical');
+}
+
+/* ============================================================
+   List view
+   ============================================================ */
+function clearFilters(){
+  document.getElementById('searchBox').value='';
+  document.getElementById('filterMonth').value='';
+  document.getElementById('filterResult').value='';
+  renderList();
+}
+
+function getFiltered(){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const mo = document.getElementById('filterMonth').value; // YYYY-MM
+  const res = document.getElementById('filterResult').value;
+  return records.filter(r=>{
+    if(mo && !(r.date||'').startsWith(mo)) return false;
+    if(res && r.result!==res) return false;
+    if(q){
+      const hay = [r.zone,r.room,r.machine,r.operator,r.chemical,r.notes].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
+}
+
+function renderList(){
+  const rows = getFiltered();
+  const body = document.getElementById('listBody');
+  if(!rows.length){
+    body.innerHTML = `<tr><td colspan="11"><div class="empty">ยังไม่มีข้อมูล — เริ่มบันทึกที่แท็บ “บันทึกข้อมูล”</div></td></tr>`;
+  }else{
+    body.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${thaiDate(r.date)}</td>
+        <td>${esc(r.time)}</td>
+        <td><strong>${esc(r.zone)}</strong>${r.room?'<br><span style="color:var(--muted)">'+esc(r.room)+'</span>':''}</td>
+        <td>${esc(r.machine)}</td>
+        <td>${esc(r.operator)}</td>
+        <td>${esc(r.chemical)||'-'}</td>
+        <td>${r.volume?fmt(r.volume)+' มล.':'-'}</td>
+        <td>${r.area?fmt(r.area)+' ตร.ม.':'-'}</td>
+        <td>${r.duration?fmt(r.duration):'-'}</td>
+        <td><span class="tag ${r.result==='ปกติ'?'ok':'warn'}">${esc(r.result)}</span></td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" title="แก้ไข" onclick="editRecord('${r.id}')">✏️</button>
+            <button class="icon-btn" title="ลบ" onclick="deleteRecord('${r.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+  document.getElementById('listCount').textContent =
+    `แสดง ${rows.length.toLocaleString('th-TH')} รายการ (ทั้งหมด ${records.length.toLocaleString('th-TH')} รายการ)`;
+}
+
+/* ============================================================
+   CSV export / JSON backup
+   ============================================================ */
+const CSV_COLS = [
+  ['date','วันที่'],['time','เวลา'],['zone','อาคาร/โซน'],['room','จุด/ห้อง'],
+  ['machine','หมายเลขเครื่อง'],['operator','ผู้ปฏิบัติงาน'],['chemical','น้ำยา'],
+  ['volume','ปริมาณ(มล.)'],['area','พื้นที่(ตร.ม.)'],['duration','ระยะเวลา(นาที)'],
+  ['result','ผลตรวจ'],['notes','หมายเหตุ']
+];
+function exportCSV(){
+  const rows = getFiltered();
+  if(!rows.length){ toast('ไม่มีข้อมูลให้ส่งออก', true); return; }
+  const head = CSV_COLS.map(c=>c[1]).join(',');
+  const lines = rows.map(r=> CSV_COLS.map(c=>{
+    const v = String(r[c[0]]??'');
+    return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  }).join(','));
+  const csv = '﻿' + head + '\n' + lines.join('\n');
+  download(new Blob([csv],{type:'text/csv;charset=utf-8'}), `disinfection_${today()}.csv`);
+  toast('ส่งออก CSV แล้ว ✓');
+}
+function exportBackup(){
+  download(new Blob([JSON.stringify(records,null,2)],{type:'application/json'}),
+    `qsncc_backup_${today()}.json`);
+  toast('สำรองข้อมูลแล้ว ✓');
+}
+function importBackup(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      if(!Array.isArray(data)) throw 0;
+      if(!confirm(`นำเข้า ${data.length} รายการ? ข้อมูลจะถูกเพิ่มต่อจากของเดิม`)) return;
+      // ensure ids
+      data.forEach(d=>{ if(!d.id) d.id=uid(); });
+      records = records.concat(data);
+      persist(); refreshDatalists(); renderList();
+      toast('นำเข้าข้อมูลแล้ว ✓');
+    }catch(err){ toast('ไฟล์ไม่ถูกต้อง', true); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+function download(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function today(){ return new Date().toISOString().slice(0,10); }
+
+/* ============================================================
+   Reports
+   ============================================================ */
+function buildReportSelectors(){
+  const years = [...new Set(records.map(r=>(r.date||'').slice(0,4)).filter(Boolean))];
+  const nowY = new Date().getFullYear().toString();
+  if(!years.includes(nowY)) years.push(nowY);
+  years.sort((a,b)=>b-a);
+  const ySel = document.getElementById('reportYear');
+  ySel.innerHTML = years.map(y=>`<option value="${y}">${parseInt(y)+543} (${y})</option>`).join('');
+  const mSel = document.getElementById('reportMonth');
+  mSel.innerHTML = THAI_MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+  mSel.value = new Date().getMonth()+1;
+}
+function onReportTypeChange(){
+  const t = document.getElementById('reportType').value;
+  document.getElementById('wrapYear').style.display   = (t==='session') ? 'none':'flex';
+  document.getElementById('wrapMonth').style.display  = (t==='month') ? 'flex':'none';
+  document.getElementById('wrapQuarter').style.display= (t==='quarter') ? 'flex':'none';
+}
+
+function statCard(label, value, unit){
+  return `<div class="stat"><div class="label">${label}</div>
+    <div class="value">${value}<span class="unit">${unit||''}</span></div></div>`;
+}
+function aggregate(rows){
+  return {
+    count: rows.length,
+    volume: rows.reduce((s,r)=>s+num(r.volume),0),
+    area: rows.reduce((s,r)=>s+num(r.area),0),
+    duration: rows.reduce((s,r)=>s+num(r.duration),0),
+    machines: new Set(rows.map(r=>r.machine).filter(Boolean)).size,
+    operators: new Set(rows.map(r=>r.operator).filter(Boolean)).size,
+    issues: rows.filter(r=>r.result==='พบปัญหา').length,
+  };
+}
+function statBlock(a){
+  return `<div class="stats">
+    ${statCard('จำนวนครั้งที่พ่น', a.count.toLocaleString('th-TH'), 'ครั้ง')}
+    ${statCard('ปริมาณน้ำยารวม', fmt(a.volume), 'มล.')}
+    ${statCard('พื้นที่รวม', fmt(a.area), 'ตร.ม.')}
+    ${statCard('เวลารวม', fmt(a.duration), 'นาที')}
+    ${statCard('เครื่องที่ใช้', a.machines, 'เครื่อง')}
+    ${statCard('ผู้ปฏิบัติงาน', a.operators, 'คน')}
+    ${statCard('พบปัญหา', a.issues.toLocaleString('th-TH'), 'ครั้ง')}
+  </div>`;
+}
+function barChart(title, pairs){ // pairs: [label, value]
+  if(!pairs.length) return '';
+  const max = Math.max(...pairs.map(p=>p[1]),1);
+  return `<div class="card"><h2>${title}</h2><div class="bars">${
+    pairs.map(([l,v])=>`<div class="bar-row">
+      <div>${esc(l)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(1)}%"></div></div>
+      <div class="bar-val">${v.toLocaleString('th-TH')}</div>
+    </div>`).join('')
+  }</div></div>`;
+}
+function groupCount(rows, key){
+  const m = {};
+  rows.forEach(r=>{ const k=r[key]||'(ไม่ระบุ)'; m[k]=(m[k]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+
+function detailTable(rows){
+  if(!rows.length) return `<div class="card"><div class="empty">ไม่มีข้อมูลในช่วงเวลานี้</div></div>`;
+  const sorted = [...rows].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  return `<div class="card"><h2>รายละเอียดการปฏิบัติงาน</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>วันที่</th><th>เวลา</th><th>โซน/จุด</th><th>เครื่อง</th>
+        <th>ผู้ปฏิบัติงาน</th><th>น้ำยา</th><th>ปริมาณ</th><th>พื้นที่</th><th>ผล</th></tr></thead>
+      <tbody>${sorted.map(r=>`<tr>
+        <td>${thaiDate(r.date)}</td><td>${esc(r.time)}</td>
+        <td>${esc(r.zone)}${r.room?' / '+esc(r.room):''}</td>
+        <td>${esc(r.machine)}</td><td>${esc(r.operator)}</td>
+        <td>${esc(r.chemical)||'-'}</td><td>${r.volume?fmt(r.volume):'-'}</td>
+        <td>${r.area?fmt(r.area):'-'}</td>
+        <td><span class="tag ${r.result==='ปกติ'?'ok':'warn'}">${esc(r.result)}</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+
+function generateReport(){
+  const type = document.getElementById('reportType').value;
+  const year = document.getElementById('reportYear').value;
+  let rows, title, subtitle, breakdown='';
+
+  if(type==='session'){
+    rows = [...records];
+    title = 'รายงานรายครั้ง (ทั้งหมด)';
+    subtitle = 'รายการปฏิบัติงานพ่นฆ่าเชื้อทุกครั้งที่บันทึกไว้';
+  }
+  else if(type==='month'){
+    const mo = parseInt(document.getElementById('reportMonth').value);
+    const pref = `${year}-${String(mo).padStart(2,'0')}`;
+    rows = records.filter(r=>(r.date||'').startsWith(pref));
+    title = `รายงานประจำเดือน ${THAI_MONTHS[mo-1]} ${parseInt(year)+543}`;
+    subtitle = `สรุปการปฏิบัติงานระหว่างวันที่ 1–สิ้นเดือน`;
+    // breakdown by day
+    const days = {};
+    rows.forEach(r=>{ const d=parseInt((r.date||'').slice(8,10)); days[d]=(days[d]||0)+1; });
+    breakdown = barChart('จำนวนครั้งต่อวัน', Object.entries(days)
+      .sort((a,b)=>a[0]-b[0]).map(([d,v])=>['วันที่ '+d, v]));
+  }
+  else if(type==='quarter'){
+    const q = parseInt(document.getElementById('reportQuarter').value);
+    rows = records.filter(r=>{
+      if(!(r.date||'').startsWith(year)) return false;
+      return quarterOf(parseInt(r.date.slice(5,7)))===q;
+    });
+    const qm = {1:[0,1,2],2:[3,4,5],3:[6,7,8],4:[9,10,11]}[q];
+    title = `รายงานประจำไตรมาสที่ ${q} ปี ${parseInt(year)+543}`;
+    subtitle = `เดือน ${qm.map(i=>THAI_MONTHS[i]).join(' – ')}`;
+    const byMonth = {};
+    rows.forEach(r=>{ const m=parseInt(r.date.slice(5,7)); byMonth[m]=(byMonth[m]||0)+1; });
+    breakdown = barChart('จำนวนครั้งต่อเดือน', qm.map(i=>[THAI_MONTHS[i], byMonth[i+1]||0]));
+  }
+  else{ // year
+    rows = records.filter(r=>(r.date||'').startsWith(year));
+    title = `รายงานประจำปี ${parseInt(year)+543}`;
+    subtitle = `สรุปการปฏิบัติงานตลอดทั้งปี (${year})`;
+    const byMonth = {};
+    rows.forEach(r=>{ const m=parseInt(r.date.slice(5,7)); byMonth[m]=(byMonth[m]||0)+1; });
+    breakdown = barChart('จำนวนครั้งต่อเดือน',
+      THAI_MONTHS.map((mn,i)=>[mn, byMonth[i+1]||0]));
+  }
+
+  const a = aggregate(rows);
+  const zoneChart = barChart('จำนวนครั้งแยกตามโซน (สูงสุด 10 อันดับ)', groupCount(rows,'zone').slice(0,10));
+  const machineChart = barChart('การใช้งานแยกตามเครื่อง', groupCount(rows,'machine').slice(0,10));
+
+  const html = `
+    <div class="card">
+      <h2>${title}</h2>
+      <div class="sub">${subtitle} · จัดทำเมื่อ ${thaiDate(today())}</div>
+    </div>
+    <div class="card">
+      <h2>สรุปภาพรวม</h2>
+      ${statBlock(a)}
+    </div>
+    ${breakdown}
+    ${zoneChart}
+    ${machineChart}
+    ${detailTable(rows)}
+  `;
+  document.getElementById('reportOutput').innerHTML = html;
+  // mirror into print area
+  document.getElementById('print-only').innerHTML =
+    `<h1 style="text-align:center">ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ · QSNCC</h1>` + html;
+  if(!rows.length) toast('ไม่พบข้อมูลในช่วงเวลาที่เลือก', true);
+}
+
+/* ============================================================
+   Init
+   ============================================================ */
+resetForm();
+refreshDatalists();
+renderList();
+buildReportSelectors();
+onReportTypeChange();
+</script>
+</body>
+</html>
