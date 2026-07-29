@@ -2,732 +2,722 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ | QSNCC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f766e" />
+<title>QSNCC · บันทึกการซ่อมเครื่องฆ่าเชื้อ</title>
 <style>
   :root{
-    --bg:#0f172a; --panel:#ffffff; --muted:#64748b; --line:#e2e8f0;
-    --brand:#0d9488; --brand-dark:#0f766e; --brand-soft:#ccfbf1;
-    --ink:#0f172a; --danger:#dc2626; --warn:#d97706; --ok:#16a34a;
-    --shadow:0 1px 3px rgba(15,23,42,.08),0 8px 24px rgba(15,23,42,.06);
-    --radius:14px;
+    --brand:#0d9488;--brand-dark:#0f766e;--brand-soft:#ccfbf1;
+    --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--panel:#fff;
+    --danger:#dc2626;--danger-soft:#fef2f2;--warn:#d97706;--warn-soft:#fef3c7;
+    --ok:#16a34a;--ok-soft:#dcfce7;--pending:#7c3aed;
+    --shadow:0 1px 3px rgba(15,23,42,.1),0 4px 16px rgba(15,23,42,.06);
+    --safe-b:env(safe-area-inset-bottom,0px);
   }
-  *{box-sizing:border-box}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
   body{
-    margin:0; font-family:"Segoe UI",Tahoma,"Sarabun","Noto Sans Thai",sans-serif;
-    background:linear-gradient(180deg,#f1f5f9,#e2e8f0 40%,#f8fafc);
-    color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased;
+    font-family:"Segoe UI",Tahoma,"Sarabun","Noto Sans Thai",sans-serif;
+    background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45;
+    overscroll-behavior-y:none;
   }
-  header.app{
-    background:linear-gradient(120deg,var(--brand-dark),var(--brand));
-    color:#fff; padding:20px 24px; box-shadow:var(--shadow);
-    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:20;background:linear-gradient(120deg,var(--brand-dark),var(--brand));
+    color:#fff;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;
+    display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);
   }
-  header.app .logo{
-    width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.18);
-    display:grid;place-items:center;font-size:26px;flex:0 0 auto;
-  }
-  header.app h1{margin:0;font-size:20px;font-weight:700;line-height:1.2}
-  header.app p{margin:2px 0 0;font-size:13px;opacity:.9}
-  header.app .spacer{flex:1}
-  header.app .hdr-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .topbar .back{background:rgba(255,255,255,.2);border:none;color:#fff;width:38px;height:38px;
+    border-radius:10px;font-size:20px;cursor:pointer;flex:0 0 auto;display:none;place-items:center}
+  .topbar .back.show{display:grid}
+  .topbar h1{font-size:16px;margin:0;font-weight:700;flex:1;line-height:1.2}
+  .topbar h1 small{display:block;font-weight:400;font-size:11px;opacity:.85}
+  .netdot{width:11px;height:11px;border-radius:50%;background:#f87171;flex:0 0 auto;box-shadow:0 0 0 3px rgba(255,255,255,.15)}
+  .netdot.online{background:#4ade80}
 
-  nav.tabs{
-    display:flex;gap:6px;padding:12px 24px 0;flex-wrap:wrap;
-    background:transparent;
-  }
-  nav.tabs button{
-    border:none;background:#fff;color:var(--muted);cursor:pointer;
-    padding:11px 18px;border-radius:12px 12px 0 0;font-size:15px;font-weight:600;
-    border:1px solid var(--line);border-bottom:none;transition:.15s;
-  }
-  nav.tabs button.active{color:var(--brand-dark);background:#fff;box-shadow:0 -2px 0 var(--brand) inset}
-  nav.tabs button:not(.active):hover{background:#f8fafc}
-
-  main{padding:0 24px 48px}
-  .view{display:none;animation:fade .2s ease}
-  .view.active{display:block}
+  main{padding:14px 14px 120px;max-width:720px;margin:0 auto}
+  .screen{display:none;animation:fade .18s ease}
+  .screen.active{display:block}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-  .card{
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:22px;margin-bottom:20px;
-  }
-  .card h2{margin:0 0 4px;font-size:18px}
-  .card .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+  .card h2{margin:0 0 3px;font-size:16px}
+  .card .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
 
-  /* form */
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-  .field{display:flex;flex-direction:column;gap:6px}
-  .field label{font-size:13px;font-weight:600;color:#334155}
-  .field label .req{color:var(--danger)}
-  .field input,.field select,.field textarea{
-    padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;
-    font-family:inherit;background:#fff;color:var(--ink);transition:.15s;
-  }
-  .field input:focus,.field select:focus,.field textarea:focus{
-    outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);
-  }
-  .field textarea{resize:vertical;min-height:64px}
+  label{display:block;font-size:13px;font-weight:600;color:#334155;margin:0 0 6px}
+  input,select,textarea{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;
+    font-size:16px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  textarea{min-height:64px;resize:vertical}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  .field{margin-bottom:12px}
 
-  .btn{
-    border:none;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;
-    cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px;transition:.15s;
-  }
-  .btn-primary{background:var(--brand);color:#fff}
-  .btn-primary:hover{background:var(--brand-dark)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-primary{background:var(--brand);color:#fff}.btn-primary:active{background:var(--brand-dark)}
+  .btn-primary:disabled{background:#cbd5e1;color:#fff}
   .btn-ghost{background:#f1f5f9;color:#334155}
-  .btn-ghost:hover{background:#e2e8f0}
-  .btn-danger{background:#fef2f2;color:var(--danger)}
-  .btn-danger:hover{background:#fee2e2}
-  .btn-sm{padding:6px 12px;font-size:13px}
-  .form-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .btn-outline{background:#fff;border:1.5px solid var(--brand);color:var(--brand-dark)}
+  .btn-danger{background:var(--danger-soft);color:var(--danger)}
+  .btn-row{display:flex;gap:10px}.btn-row>*{flex:1}
+  .btn.sm{padding:10px 12px;font-size:14px;width:auto}
 
-  /* toolbar */
-  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-  .toolbar input,.toolbar select{
-    padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;
-  }
-  .toolbar .spacer{flex:1}
+  .tile{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+    border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;font-family:inherit}
+  .tile:active{background:#f8fafc}
+  .tile .ic{width:44px;height:44px;border-radius:11px;background:var(--brand-soft);color:var(--brand-dark);
+    display:grid;place-items:center;font-size:22px;flex:0 0 auto}
+  .tile .tx{flex:1;min-width:0}
+  .tile .tx b{display:block;font-size:15px}
+  .tile .tx span{color:var(--muted);font-size:13px}
+  .tile .arrow{color:#cbd5e1;font-size:20px}
 
-  /* table */
-  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
-  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px}
-  thead th{
-    background:#f8fafc;text-align:left;padding:11px 12px;font-weight:700;color:#475569;
-    border-bottom:2px solid var(--line);white-space:nowrap;position:sticky;top:0;
-  }
-  tbody td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-  tbody tr:hover{background:#f8fafc}
-  tbody tr:last-child td{border-bottom:none}
-  .empty{padding:40px;text-align:center;color:var(--muted)}
-  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
-  .tag.ok{background:#dcfce7;color:#15803d}
-  .tag.warn{background:#fef3c7;color:#b45309}
-  .row-actions{display:flex;gap:6px;white-space:nowrap}
-  .icon-btn{border:none;background:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px}
-  .icon-btn:hover{background:#e2e8f0}
+  .search{position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:10;background:var(--bg);
+    padding:2px 0 10px}
+  .search input{background:#fff}
 
-  /* stats */
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
-  .stat{
-    background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid var(--line);
-    border-radius:12px;padding:16px 18px;
-  }
-  .stat .label{font-size:13px;color:var(--muted);font-weight:600}
-  .stat .value{font-size:26px;font-weight:800;color:var(--brand-dark);margin-top:4px;line-height:1}
-  .stat .unit{font-size:13px;color:var(--muted);font-weight:600;margin-left:3px}
+  .plist .tile{margin-bottom:8px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+  .badge.zone{background:#e0f2fe;color:#0369a1}
+  .badge.cnt{background:#f1f5f9;color:#475569}
 
-  /* bar chart */
-  .bars{display:flex;flex-direction:column;gap:9px;margin-top:6px}
-  .bar-row{display:grid;grid-template-columns:130px 1fr 60px;align-items:center;gap:10px;font-size:13px}
-  .bar-track{background:#f1f5f9;border-radius:8px;height:22px;overflow:hidden}
-  .bar-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-dark));border-radius:8px;min-width:2px;transition:width .4s}
-  .bar-val{text-align:right;font-weight:700;color:#334155}
+  /* machine grid */
+  .grp-title{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-weight:700;font-size:14px;color:#334155}
+  .grp-title .line{flex:1;height:1px;background:var(--line)}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:9px}
+  .mcell{position:relative;border:1.5px solid var(--line);border-radius:12px;background:#fff;padding:12px 6px;
+    text-align:center;cursor:pointer;font-family:inherit;font-weight:700;font-size:15px}
+  .mcell small{display:block;font-weight:600;font-size:11px;color:var(--muted);margin-top:2px}
+  .mcell.sel{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+  .mcell.done{border-style:dashed;opacity:.85}
+  .mcell .dupflag{position:absolute;top:-6px;right:-6px;background:var(--warn);color:#fff;border-radius:999px;
+    font-size:10px;padding:1px 6px;font-weight:700}
+  .mcell.sel::after{content:"✓";position:absolute;top:-7px;left:-7px;background:var(--brand);color:#fff;
+    width:20px;height:20px;border-radius:50%;font-size:12px;display:grid;place-items:center}
 
-  .hint{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:16px}
-  .toast{
-    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120%);
-    background:var(--ink);color:#fff;padding:13px 22px;border-radius:12px;font-size:14px;
-    box-shadow:var(--shadow);transition:.3s;z-index:99;font-weight:600;
-  }
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:9px 14px;font-size:14px;
+    font-weight:600;cursor:pointer;font-family:inherit;color:#334155}
+  .chip.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+  .chip.rep.on{border-color:var(--ok);background:var(--ok-soft);color:#15803d}
+  .chip:disabled{opacity:.4;cursor:not-allowed}
+
+  .mdetail{border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;background:#fff}
+  .mdetail>summary{list-style:none;cursor:pointer;padding:14px;display:flex;align-items:center;gap:10px;font-weight:700}
+  .mdetail>summary::-webkit-details-marker{display:none}
+  .mdetail>summary .st{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+  .mdetail .body{padding:0 14px 14px;border-top:1px solid var(--line)}
+  .mini-label{font-size:12px;font-weight:700;color:#475569;margin:14px 0 7px;text-transform:none}
+
+  .st.ok{background:var(--ok-soft);color:#15803d}
+  .st.warn{background:var(--warn-soft);color:#b45309}
+  .st.pending{background:#ede9fe;color:#6d28d9}
+  .st.none{background:#f1f5f9;color:#64748b}
+
+  /* bottom action bar */
+  .actionbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+    padding:12px 14px calc(12px + var(--safe-b));box-shadow:0 -4px 16px rgba(15,23,42,.06);z-index:30;display:none}
+  .actionbar.show{display:block}
+  .actionbar .inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  .actionbar .cnt{font-size:13px;color:var(--muted);flex:0 0 auto}
+  .actionbar .cnt b{color:var(--ink);font-size:16px}
+
+  .banner{border-radius:12px;padding:11px 13px;font-size:13px;margin-bottom:12px;font-weight:600}
+  .banner.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+  .banner.warn{background:var(--warn-soft);border:1px solid #fde68a;color:#92400e}
+  .banner.ok{background:var(--ok-soft);border:1px solid #bbf7d0;color:#166534}
+
+  .stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .stat{background:linear-gradient(135deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat .v{font-size:24px;font-weight:800;color:var(--brand-dark);line-height:1}
+  .stat .l{font-size:11px;color:var(--muted);font-weight:600;margin-top:4px}
+
+  .empty{text-align:center;color:var(--muted);padding:34px 10px;font-size:14px}
+
+  .hist{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+  .hist .h{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px}
+
+  .toast{position:fixed;bottom:calc(90px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(200%);
+    background:var(--ink);color:#fff;padding:13px 20px;border-radius:12px;font-size:14px;font-weight:600;
+    z-index:99;box-shadow:var(--shadow);transition:.3s;max-width:90%;text-align:center}
   .toast.show{transform:translateX(-50%) translateY(0)}
-  .toast.err{background:var(--danger)}
+  .toast.err{background:var(--danger)}.toast.ok{background:var(--brand-dark)}
 
-  footer.app{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+  .out-item{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:8px;background:#fff}
+  .out-item .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .dot.pending{background:var(--warn)}.dot.synced{background:var(--ok)}.dot.error{background:var(--danger)}
+  .out-item .tx{flex:1;min-width:0}
+  .out-item .tx b{font-size:14px}.out-item .tx span{font-size:12px;color:var(--muted);display:block}
 
-  @media print{
-    header.app,nav.tabs,.toolbar,.form-actions,.hdr-actions,footer.app,.no-print{display:none!important}
-    body{background:#fff}
-    .view{display:none!important}
-    #print-only{display:block!important}
-    .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid}
-  }
-  #print-only{display:none}
-  @media(max-width:640px){
-    header.app{padding:16px}
-    main{padding:0 12px 40px}
-    nav.tabs{padding:12px 12px 0}
-    .bar-row{grid-template-columns:90px 1fr 48px}
-  }
+  .link{color:var(--brand-dark);text-decoration:underline;cursor:pointer;font-weight:600}
 </style>
 </head>
 <body>
-<header class="app">
-  <div class="logo">🧴</div>
-  <div>
-    <h1>ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ</h1>
-    <p>QSNCC — Disinfection Machine Registry &amp; Reporting</p>
-  </div>
-  <div class="spacer"></div>
-  <div class="hdr-actions">
-    <button class="btn btn-ghost btn-sm" onclick="exportBackup()">⬇️ สำรองข้อมูล</button>
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⬆️ นำเข้า</button>
-    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)" />
-  </div>
-</header>
 
-<nav class="tabs">
-  <button class="tab-btn active" data-view="record">📝 บันทึกข้อมูล</button>
-  <button class="tab-btn" data-view="list">📋 รายการทั้งหมด</button>
-  <button class="tab-btn" data-view="report">📊 รายงาน</button>
-</nav>
+<div class="topbar">
+  <button class="back" id="backBtn" onclick="goBack()">‹</button>
+  <h1 id="ttl">บันทึกการซ่อม<small>QSNCC · เครื่องฆ่าเชื้อ</small></h1>
+  <div class="netdot" id="netdot" title="สถานะเครือข่าย"></div>
+</div>
 
 <main>
-  <!-- ============ RECORD ============ -->
-  <section class="view active" id="view-record">
+  <!-- ============ HOME ============ -->
+  <section class="screen active" id="s-home">
+    <div id="syncBanner"></div>
     <div class="card">
-      <h2 id="formTitle">บันทึกการใช้งานใหม่</h2>
-      <div class="sub">กรอกข้อมูลการปฏิบัติงานพ่นฆ่าเชื้อแต่ละครั้ง — ช่องที่มี <span style="color:var(--danger)">*</span> จำเป็นต้องกรอก</div>
-      <form id="recordForm" onsubmit="saveRecord(event)">
-        <input type="hidden" id="editId" />
-        <div class="grid">
-          <div class="field">
-            <label>วันที่ <span class="req">*</span></label>
-            <input type="date" id="f_date" required />
-          </div>
-          <div class="field">
-            <label>เวลา <span class="req">*</span></label>
-            <input type="time" id="f_time" required />
-          </div>
-          <div class="field">
-            <label>อาคาร / โซน <span class="req">*</span></label>
-            <input type="text" id="f_zone" list="zoneList" placeholder="เช่น Zone A, ชั้น 2" required />
-            <datalist id="zoneList"></datalist>
-          </div>
-          <div class="field">
-            <label>จุด / ห้องที่ปฏิบัติงาน</label>
-            <input type="text" id="f_room" placeholder="เช่น ห้องประชุม 201, โถงต้อนรับ" />
-          </div>
-          <div class="field">
-            <label>หมายเลขเครื่อง <span class="req">*</span></label>
-            <input type="text" id="f_machine" list="machineList" placeholder="เช่น DM-01" required />
-            <datalist id="machineList"></datalist>
-          </div>
-          <div class="field">
-            <label>ผู้ปฏิบัติงาน <span class="req">*</span></label>
-            <input type="text" id="f_operator" list="operatorList" placeholder="ชื่อ-สกุล" required />
-            <datalist id="operatorList"></datalist>
-          </div>
-          <div class="field">
-            <label>น้ำยาฆ่าเชื้อ</label>
-            <input type="text" id="f_chemical" list="chemList" placeholder="เช่น ไฮโปคลอไรต์ 0.5%" />
-            <datalist id="chemList"></datalist>
-          </div>
-          <div class="field">
-            <label>ปริมาณน้ำยา (มล.)</label>
-            <input type="number" id="f_volume" min="0" step="1" placeholder="0" />
-          </div>
-          <div class="field">
-            <label>พื้นที่ที่พ่น (ตร.ม.)</label>
-            <input type="number" id="f_area" min="0" step="0.1" placeholder="0" />
-          </div>
-          <div class="field">
-            <label>ระยะเวลา (นาที)</label>
-            <input type="number" id="f_duration" min="0" step="1" placeholder="0" />
-          </div>
-          <div class="field">
-            <label>ผลการตรวจสอบ</label>
-            <select id="f_result">
-              <option value="ปกติ">ปกติ</option>
-              <option value="พบปัญหา">พบปัญหา</option>
-            </select>
-          </div>
-        </div>
-        <div class="field" style="margin-top:14px">
-          <label>หมายเหตุ</label>
-          <textarea id="f_notes" placeholder="รายละเอียดเพิ่มเติม เช่น อาการเครื่อง การบำรุงรักษา ฯลฯ"></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">💾 บันทึกข้อมูล</button>
-          <button type="reset" class="btn btn-ghost" onclick="resetForm()">ล้างฟอร์ม</button>
-          <button type="button" class="btn btn-ghost" id="cancelEdit" style="display:none" onclick="resetForm()">ยกเลิกการแก้ไข</button>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <!-- ============ LIST ============ -->
-  <section class="view" id="view-list">
-    <div class="card">
-      <h2>รายการบันทึกทั้งหมด</h2>
-      <div class="sub">ค้นหา กรอง แก้ไข หรือลบข้อมูลได้จากตารางนี้</div>
-      <div class="toolbar">
-        <input type="text" id="searchBox" placeholder="🔍 ค้นหา (โซน, เครื่อง, ผู้ปฏิบัติงาน...)" oninput="renderList()" style="min-width:240px" />
-        <input type="month" id="filterMonth" onchange="renderList()" />
-        <select id="filterResult" onchange="renderList()">
-          <option value="">ทุกผลตรวจ</option>
-          <option value="ปกติ">ปกติ</option>
-          <option value="พบปัญหา">พบปัญหา</option>
-        </select>
-        <div class="spacer"></div>
-        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📄 ส่งออก CSV</button>
-        <button class="btn btn-danger btn-sm" onclick="clearFilters()">ล้างตัวกรอง</button>
+      <h2>รอบตรวจปัจจุบัน</h2>
+      <div class="sub">ตั้งค่าครั้งเดียว ใช้ตลอดรอบ — ไม่ต้องกรอกซ้ำทุกเครื่อง</div>
+      <div class="field">
+        <label>วันที่</label>
+        <input type="date" id="sesDate" onchange="onSessionChange()" />
       </div>
-      <div class="table-wrap">
-        <table id="listTable">
-          <thead>
-            <tr>
-              <th>วันที่</th><th>เวลา</th><th>โซน / จุด</th><th>เครื่อง</th>
-              <th>ผู้ปฏิบัติงาน</th><th>น้ำยา</th><th>ปริมาณ</th><th>พื้นที่</th>
-              <th>เวลา(น.)</th><th>ผล</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="listBody"></tbody>
-        </table>
-      </div>
-      <div id="listCount" class="sub" style="margin-top:12px"></div>
-    </div>
-  </section>
-
-  <!-- ============ REPORT ============ -->
-  <section class="view" id="view-report">
-    <div class="card">
-      <h2>จัดทำรายงาน</h2>
-      <div class="sub">เลือกประเภทและช่วงเวลาของรายงานที่ต้องการ</div>
-      <div class="toolbar">
-        <div class="field" style="flex-direction:row;align-items:center;gap:8px">
-          <label style="margin:0">ประเภท:</label>
-          <select id="reportType" onchange="onReportTypeChange()">
-            <option value="session">รายครั้ง</option>
-            <option value="month" selected>รายเดือน</option>
-            <option value="quarter">รายไตรมาส</option>
-            <option value="year">รายปี</option>
+      <div class="row">
+        <div class="field">
+          <label>รอบ</label>
+          <select id="sesRound" onchange="onSessionChange()">
+            <option value="R1">รอบ 1 (R1)</option>
+            <option value="R2">รอบ 2 (R2)</option>
           </select>
         </div>
-        <div class="field" id="wrapYear" style="flex-direction:row;align-items:center;gap:8px">
-          <label style="margin:0">ปี:</label>
-          <select id="reportYear"></select>
+        <div class="field">
+          <label>ผู้บันทึก</label>
+          <input type="text" id="sesRecorder" list="recorderList" placeholder="ชื่อช่าง" oninput="onSessionChange()" />
+          <datalist id="recorderList"></datalist>
         </div>
-        <div class="field" id="wrapMonth" style="flex-direction:row;align-items:center;gap:8px;display:none">
-          <label style="margin:0">เดือน:</label>
-          <select id="reportMonth"></select>
-        </div>
-        <div class="field" id="wrapQuarter" style="flex-direction:row;align-items:center;gap:8px;display:none">
-          <label style="margin:0">ไตรมาส:</label>
-          <select id="reportQuarter">
-            <option value="1">Q1 (ม.ค.–มี.ค.)</option>
-            <option value="2">Q2 (เม.ย.–มิ.ย.)</option>
-            <option value="3">Q3 (ก.ค.–ก.ย.)</option>
-            <option value="4">Q4 (ต.ค.–ธ.ค.)</option>
-          </select>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="generateReport()">สร้างรายงาน</button>
-        <div class="spacer"></div>
-        <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
       </div>
     </div>
-    <div id="reportOutput"></div>
+
+    <div class="card">
+      <h2>ความคืบหน้ารอบนี้</h2>
+      <div class="sub" id="roundLabel">—</div>
+      <div class="stat-row">
+        <div class="stat"><div class="v" id="stPoints">0</div><div class="l">จุดที่บันทึก</div></div>
+        <div class="stat"><div class="v" id="stMachines">0</div><div class="l">เครื่องที่บันทึก</div></div>
+        <div class="stat"><div class="v" id="stPending">0</div><div class="l">รอ sync</div></div>
+      </div>
+    </div>
+
+    <button class="tile" onclick="openPoints()">
+      <div class="ic">📍</div>
+      <div class="tx"><b>เลือกจุดติดตั้ง</b><span id="pointCountLabel">— จุด</span></div>
+      <div class="arrow">›</div>
+    </button>
+    <button class="tile" onclick="show('s-history');loadHistoryScreen()">
+      <div class="ic">🕘</div>
+      <div class="tx"><b>ประวัติการซ่อมต่อเครื่อง</b><span>ค้นด้วย Machine ID</span></div>
+      <div class="arrow">›</div>
+    </button>
+    <button class="tile" onclick="show('s-outbox');renderOutbox()">
+      <div class="ic">☁️</div>
+      <div class="tx"><b>รายการรอ sync / ส่งขึ้น Sheets</b><span id="outboxLabel">0 รายการ</span></div>
+      <div class="arrow">›</div>
+    </button>
+    <button class="tile" onclick="show('s-settings')">
+      <div class="ic">⚙️</div>
+      <div class="tx"><b>ตั้งค่าการเชื่อมต่อ</b><span id="connLabel">ยังไม่เชื่อมต่อ</span></div>
+      <div class="arrow">›</div>
+    </button>
+  </section>
+
+  <!-- ============ POINTS ============ -->
+  <section class="screen" id="s-points">
+    <div class="search"><input type="text" id="pointSearch" placeholder="🔍 ค้นหาจุด (รหัส/โซน/ตำแหน่ง)" oninput="renderPoints()" /></div>
+    <div class="plist" id="pointList"></div>
+  </section>
+
+  <!-- ============ MACHINES ============ -->
+  <section class="screen" id="s-machines">
+    <div id="pointHead" class="card" style="margin-bottom:10px"></div>
+    <div class="banner info">แตะเลือกเครื่องที่มีปัญหา (เลือกได้หลายเครื่อง) เครื่องที่มี <span class="badge cnt">วันนี้</span> เคยบันทึกวันนี้แล้ว</div>
+    <div id="machineGroups"></div>
+  </section>
+
+  <!-- ============ DETAIL ============ -->
+  <section class="screen" id="s-detail">
+    <div class="banner info" id="detailHint">กรอกอาการที่พบ / ที่ซ่อมเสร็จของแต่ละเครื่อง</div>
+    <div id="detailList"></div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="screen" id="s-history">
+    <div class="card">
+      <h2>ประวัติการซ่อมต่อเครื่อง</h2>
+      <div class="sub">พิมพ์ Machine ID เช่น R-B101-F6</div>
+      <div class="row" style="gap:8px">
+        <input type="text" id="histId" list="machineIdList" placeholder="Machine ID" />
+        <button class="btn btn-primary" style="width:auto;padding:13px 18px" onclick="loadHistory()">ค้นหา</button>
+      </div>
+    </div>
+    <div id="histResult"></div>
+  </section>
+
+  <!-- ============ OUTBOX ============ -->
+  <section class="screen" id="s-outbox">
+    <div id="outboxSummary"></div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-primary sm" style="width:auto;flex:1" onclick="syncNow()">🔄 ส่งขึ้น Google Sheets</button>
+      <button class="btn btn-ghost sm" style="width:auto;flex:1" onclick="clearSynced()">ล้างที่ส่งแล้ว</button>
+    </div>
+    <div id="outboxList"></div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="screen" id="s-settings">
+    <div class="card">
+      <h2>เชื่อมต่อ Google Sheets</h2>
+      <div class="sub">วาง URL ของ Web App (Apps Script) เพื่ออ่านทะเบียนเครื่องล่าสุด และส่งข้อมูลขึ้นชีต</div>
+      <div class="field">
+        <label>Web App URL</label>
+        <input type="url" id="cfgUrl" placeholder="https://script.google.com/macros/s/.../exec" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary sm" style="width:auto;flex:1" onclick="saveConfig()">บันทึก & ทดสอบ</button>
+        <button class="btn btn-ghost sm" style="width:auto;flex:1" onclick="refreshMaster()">โหลดทะเบียนใหม่</button>
+      </div>
+      <div id="cfgStatus" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>ข้อมูลทะเบียน (แคชในเครื่อง)</h2>
+      <div class="sub" id="masterMeta"></div>
+      <div class="banner info" style="margin:0">แอพมาพร้อมชุดข้อมูลตั้งต้นจากไฟล์ Excel จึงใช้งานออฟไลน์ได้ทันที เมื่อเชื่อมต่อ Web App จะดึงทะเบียนล่าสุดมาแทน</div>
+    </div>
   </section>
 </main>
 
-<div id="print-only"></div>
+<!-- machine picker action bar -->
+<div class="actionbar" id="abMachines">
+  <div class="inner">
+    <div class="cnt">เลือก <b id="selCount">0</b> เครื่อง</div>
+    <button class="btn btn-primary" style="flex:1" id="toDetailBtn" onclick="openDetail()">กรอกรายละเอียด ›</button>
+  </div>
+</div>
+<!-- detail save bar -->
+<div class="actionbar" id="abDetail">
+  <div class="inner">
+    <div class="cnt"><b id="saveCount">0</b> รายการ</div>
+    <button class="btn btn-primary" style="flex:1" onclick="saveAll()">💾 บันทึกทั้งหมด</button>
+  </div>
+</div>
+
+<datalist id="machineIdList"></datalist>
 <div class="toast" id="toast"></div>
-<footer class="app">
-  ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ · QSNCC · ข้อมูลถูกจัดเก็บในเบราว์เซอร์ของคุณ (localStorage)
-</footer>
 
+<script id="seed-data" type="application/json">{"zones":[{"code":"T","name":"Thaibev"},{"code":"R","name":"Ratchada"},{"code":"L","name":"Lake Side"},{"code":"Y","name":"Yasub (ยาสูบ)"}],"types":[{"code":"S","name":"ชาย (นั่ง)"},{"code":"U","name":"ชาย (ยืน)"},{"code":"F","name":"หญิง"},{"code":"D","name":"คนพิการ"}],"symptoms":[{"code":"1","name":"หัววงจรเสีย"},{"code":"2","name":"รางแบตเตอรี่ชำรุด"},{"code":"3","name":"ฝาหน้า/ฝาหลัง"},{"code":"4","name":"น้ำยารั่ว"},{"code":"5","name":"ตัวเครื่อง"},{"code":"6","name":"ท่อหลุด"}],"models":["รุ่น-1"],"statuses":["เสร็จสิ้น","เสร็จบางส่วน","รออะไหล่","ส่งซ่อมภายนอก","ยกเลิก"],"points":[{"code":"L-G08","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 1 (หน้า)","machines":[{"id":"L-G08-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G08-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G09","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 1 (หน้า)","machines":[{"id":"L-G09-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G09-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G10","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 2 (หน้า)","machines":[{"id":"L-G10-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G10-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G11","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 3 (หน้า)","machines":[{"id":"L-G11-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G11-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G12","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 3 (หน้า)","machines":[{"id":"L-G12-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G12-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G13","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 4 (หน้า)","machines":[{"id":"L-G13-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G13-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-G14","zone":"L","zname":"Lake Side","sub":"F.G","remark":"Hall 4 (หน้า)","machines":[{"id":"L-G14-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-G14-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L105","zone":"L","zname":"Lake Side","sub":"F.L1","remark":"","machines":[{"id":"L-L105-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L105-2","zone":"L","zname":"Lake Side","sub":"F.L1","remark":"","machines":[{"id":"L-L105-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L105-2-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L106","zone":"L","zname":"Lake Side","sub":"F.L1","remark":"WC - L1.","machines":[{"id":"L-L106-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L106-D2","type":"D","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L107","zone":"L","zname":"Lake Side","sub":"F.L1","remark":"","machines":[{"id":"L-L107-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L107-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L204","zone":"L","zname":"Lake Side","sub":"F.L2","remark":"Q21-WC - L2.","machines":[{"id":"L-L204-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L204-2","zone":"L","zname":"Lake Side","sub":"F.L2","remark":"Q19-WC - L2.","machines":[{"id":"L-L204-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L204-2-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L205","zone":"L","zname":"Lake Side","sub":"F.L2","remark":"P14-WC - L2.","machines":[{"id":"L-L205-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-L205-2","zone":"L","zname":"Lake Side","sub":"F.L2","remark":"P20-WC - L2.","machines":[{"id":"L-L205-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-L205-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG08","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 5 (หน้า)","machines":[{"id":"L-LG08-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG08-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG09","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 6 (หน้า)นอก","machines":[{"id":"L-LG09-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG09-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG10","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 6 (หน้า)ใน","machines":[{"id":"L-LG10-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG10-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG11","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 7 (หน้า)ใน","machines":[{"id":"L-LG11-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG11-2","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 7 (หน้า)นอก","machines":[{"id":"L-LG11-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG11-2-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG12","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Hall 8 (หน้า)","machines":[{"id":"L-LG12-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG12-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LG13","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"Retail (ฟู้ด คอร์ท)","machines":[{"id":"L-LG13-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S12","type":"S","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-S13","type":"S","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-U17","type":"U","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-F23","type":"F","num":"23","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LG13-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LM03","zone":"L","zname":"Lake Side","sub":"F.LM","remark":"Organizer (LM)","machines":[{"id":"L-LM03-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM03-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LM04","zone":"L","zname":"Lake Side","sub":"F.LM","remark":"Organizer (LM)","machines":[{"id":"L-LM04-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM04-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LM05","zone":"L","zname":"Lake Side","sub":"F.LM","remark":"Retail (ร้านอาหาร)","machines":[{"id":"L-LM05-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-S12","type":"S","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-LM05-2","zone":"L","zname":"Lake Side","sub":"F.LM","remark":"Shower room","machines":[{"id":"L-LM05-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-2-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-LM05-2-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-UM01","zone":"L","zname":"Lake Side","sub":"F.UM","remark":"Floor - UM","machines":[{"id":"L-UM01-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM01-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-UM02","zone":"L","zname":"Lake Side","sub":"F.UM","remark":"Floor - UM","machines":[{"id":"L-UM02-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"L-UM02-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-VIPRoom2(2)","zone":"L","zname":"Lake Side","sub":"F.LG","remark":"VIP (Hall 8)","machines":[{"id":"L-VIPRoom2(2)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-VIPRoom3(5)","zone":"L","zname":"Lake Side","sub":"F.G","remark":"VIP (Halll 4)","machines":[{"id":"L-VIPRoom3(5)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"L-VIPRoom3(8)","zone":"L","zname":"Lake Side","sub":"F.L1","remark":"VIP3 WC - L1","machines":[{"id":"L-VIPRoom3(8)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-B101","zone":"R","zname":"Ratchada","sub":"F.B1","remark":"ฟู้ด คอร์ท","machines":[{"id":"R-B101-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B101-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-B102","zone":"R","zname":"Ratchada","sub":"F.B1","remark":"Parking B1","machines":[{"id":"R-B102-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B102-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-B202","zone":"R","zname":"Ratchada","sub":"F.B2","remark":"Office NCC","machines":[{"id":"R-B202-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B202-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-B203","zone":"R","zname":"Ratchada","sub":"F.B2","remark":"Event Hall","machines":[{"id":"R-B203-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B203-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-B204","zone":"R","zname":"Ratchada","sub":"F.B2","remark":"Parking B2","machines":[{"id":"R-B204-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B204-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B204-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B204-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-B204-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-G07","zone":"R","zname":"Ratchada","sub":"F.G","remark":"Hall 1 (หลัง)","machines":[{"id":"R-G07-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-G07-D2","type":"D","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-L104","zone":"R","zname":"Ratchada","sub":"F.L1","remark":"WC - L1.","machines":[{"id":"R-L104-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F23","type":"F","num":"23","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F24","type":"F","num":"24","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F25","type":"F","num":"25","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F26","type":"F","num":"26","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F27","type":"F","num":"27","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F28","type":"F","num":"28","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F29","type":"F","num":"29","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F30","type":"F","num":"30","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F31","type":"F","num":"31","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F32","type":"F","num":"32","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F33","type":"F","num":"33","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F34","type":"F","num":"34","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-F35","type":"F","num":"35","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L104-D2","type":"D","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-L203","zone":"R","zname":"Ratchada","sub":"F.L2","remark":"WC - L2.","machines":[{"id":"R-L203-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-L203-2","zone":"R","zname":"Ratchada","sub":"F.L2","remark":"WC - L2.","machines":[{"id":"R-L203-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-L203-2-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-LG07","zone":"R","zname":"Ratchada","sub":"F.LG","remark":"MRT ทางเชื่อม","machines":[{"id":"R-LG07-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LG07-D2","type":"D","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-LM01","zone":"R","zname":"Ratchada","sub":"F.LM","remark":"Parking (Entrance)","machines":[{"id":"R-LM01-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM01-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-LM02","zone":"R","zname":"Ratchada","sub":"F.LM","remark":"Executive (NCC)","machines":[{"id":"R-LM02-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-LM02-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-VIPRoom1(1)","zone":"R","zname":"Ratchada","sub":"F.LG","remark":"VIP (Hall 5)","machines":[{"id":"R-VIPRoom1(1)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"R-VIPRoom1(1)-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-VIPRoom1(3)","zone":"R","zname":"Ratchada","sub":"F.G","remark":"VIP (Hall 1)","machines":[{"id":"R-VIPRoom1(3)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-VIPRoom2(4)","zone":"R","zname":"Ratchada","sub":"F.G","remark":"VIP (Hall 1)-2","machines":[{"id":"R-VIPRoom2(4)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"R-VIPRoom2(7)","zone":"R","zname":"Ratchada","sub":"F.L1","remark":"VIP2 WC - L1","machines":[{"id":"R-VIPRoom2(7)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-B201","zone":"T","zname":"Thaibev","sub":"F.B2","remark":"Locker NCC","machines":[{"id":"T-B201-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S8","type":"S","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S9","type":"S","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S10","type":"S","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S11","type":"S","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S12","type":"S","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S13","type":"S","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S14","type":"S","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S15","type":"S","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S16","type":"S","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S17","type":"S","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S18","type":"S","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S19","type":"S","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-S20","type":"S","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U17","type":"U","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U18","type":"U","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U19","type":"U","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U20","type":"U","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U21","type":"U","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U22","type":"U","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U23","type":"U","num":"23","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U24","type":"U","num":"24","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U25","type":"U","num":"25","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U26","type":"U","num":"26","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U27","type":"U","num":"27","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U28","type":"U","num":"28","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U29","type":"U","num":"29","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U30","type":"U","num":"30","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U31","type":"U","num":"31","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U32","type":"U","num":"32","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U33","type":"U","num":"33","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U34","type":"U","num":"34","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U35","type":"U","num":"35","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U36","type":"U","num":"36","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U37","type":"U","num":"37","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U38","type":"U","num":"38","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U39","type":"U","num":"39","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-U40","type":"U","num":"40","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-B201-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G01","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 4 (หลัง)","machines":[{"id":"T-G01-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G01-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G02","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 3 (หลัง)","machines":[{"id":"T-G02-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G02-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G03","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 3 (หลัง)","machines":[{"id":"T-G03-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G03-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G04","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 2 (หลัง)","machines":[{"id":"T-G04-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G04-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G05","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 2 (หลัง)","machines":[{"id":"T-G05-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G05-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-G06","zone":"T","zname":"Thaibev","sub":"F.G","remark":"Hall 1 (หลัง)","machines":[{"id":"T-G06-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-G06-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L101","zone":"T","zname":"Thaibev","sub":"F.L1","remark":"Truck Parking","machines":[{"id":"T-L101-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L101-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L102","zone":"T","zname":"Thaibev","sub":"F.L1","remark":"WCM - L1","machines":[{"id":"T-L102-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L102-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L103","zone":"T","zname":"Thaibev","sub":"F.L1","remark":"Hall 12 (Entrance)","machines":[{"id":"T-L103-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L103-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L201","zone":"T","zname":"Thaibev","sub":"F.L2","remark":"F7-WC - L2.","machines":[{"id":"T-L201-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L201-2","zone":"T","zname":"Thaibev","sub":"F.L2","remark":"F9-WC - L2.","machines":[{"id":"T-L201-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L201-2-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L202","zone":"T","zname":"Thaibev","sub":"F.L2","remark":"F19-WC - L2.","machines":[{"id":"T-L202-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-L202-2","zone":"T","zname":"Thaibev","sub":"F.L2","remark":"F21-WC - L2.","machines":[{"id":"T-L202-2-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-L202-2-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG01","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Hall 8 (หลัง)","machines":[{"id":"T-LG01-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG01-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG02","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Hall 7 (หลัง)","machines":[{"id":"T-LG02-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U17","type":"U","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-U18","type":"U","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG02-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG03","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Loading (Hall 7)","machines":[{"id":"T-LG03-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG03-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG04","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Hall 6 (หลัง)","machines":[{"id":"T-LG04-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-S7","type":"S","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG04-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG05","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Loading (Hall 5)","machines":[{"id":"T-LG05-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG05-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-LG06","zone":"T","zname":"Thaibev","sub":"F.LG","remark":"Hall 5 (หลัง)","machines":[{"id":"T-LG06-S1","type":"S","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-S2","type":"S","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-S3","type":"S","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-S4","type":"S","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-S5","type":"S","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-S6","type":"S","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U1","type":"U","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U2","type":"U","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U3","type":"U","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U4","type":"U","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U5","type":"U","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U6","type":"U","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U7","type":"U","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U8","type":"U","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U9","type":"U","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U10","type":"U","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U11","type":"U","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U12","type":"U","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U13","type":"U","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U14","type":"U","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U15","type":"U","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U16","type":"U","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U17","type":"U","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-U18","type":"U","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"T-LG06-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"T-VIPRoom1(6)","zone":"T","zname":"Thaibev","sub":"F.L1","remark":"VIP1 WC - L1","machines":[{"id":"T-VIPRoom1(6)-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"Y-G15","zone":"Y","zname":"Yasub (ยาสูบ)","sub":"F.G","remark":"Hall 4 (Fireman Lift)","machines":[{"id":"Y-G15-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F23","type":"F","num":"23","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F24","type":"F","num":"24","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F25","type":"F","num":"25","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F26","type":"F","num":"26","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F27","type":"F","num":"27","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F28","type":"F","num":"28","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F29","type":"F","num":"29","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-F30","type":"F","num":"30","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-G15-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]},{"code":"Y-LG14","zone":"Y","zname":"Yasub (ยาสูบ)","sub":"F.LG","remark":"Hall 8 (Fireman Lift)","machines":[{"id":"Y-LG14-F1","type":"F","num":"1","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F2","type":"F","num":"2","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F3","type":"F","num":"3","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F4","type":"F","num":"4","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F5","type":"F","num":"5","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F6","type":"F","num":"6","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F7","type":"F","num":"7","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F8","type":"F","num":"8","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F9","type":"F","num":"9","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F10","type":"F","num":"10","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F11","type":"F","num":"11","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F12","type":"F","num":"12","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F13","type":"F","num":"13","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F14","type":"F","num":"14","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F15","type":"F","num":"15","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F16","type":"F","num":"16","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F17","type":"F","num":"17","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F18","type":"F","num":"18","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F19","type":"F","num":"19","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F20","type":"F","num":"20","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F21","type":"F","num":"21","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F22","type":"F","num":"22","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F23","type":"F","num":"23","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F24","type":"F","num":"24","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F25","type":"F","num":"25","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F26","type":"F","num":"26","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F27","type":"F","num":"27","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F28","type":"F","num":"28","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F29","type":"F","num":"29","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-F30","type":"F","num":"30","model":"รุ่น-1","status":"ใช้งาน"},{"id":"Y-LG14-D1","type":"D","num":"1","model":"รุ่น-1","status":"ใช้งาน"}]}],"meta":{"machineCount":1503,"pointCount":70,"source":"QSNCC_Disinfection_Machine_Registry.xlsx"}}</script>
 <script>
-/* ============================================================
-   Data layer — persisted in browser localStorage
-   ============================================================ */
-const STORE_KEY = "qsncc_disinfection_records_v1";
-const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
-  "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-const THAI_MONTHS_SHORT = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+/* =====================================================================
+   QSNCC field app — mobile-first, offline-first
+   Data flow:  Google Sheets  <—Apps Script—>  this app (localStorage cache + outbox)
+   ===================================================================== */
+"use strict";
 
-let records = load();
+const LS = {
+  URL:'qsncc_backend_url', MASTER:'qsncc_master', OUTBOX:'qsncc_outbox',
+  SESSION:'qsncc_session', RECORDERS:'qsncc_recorders'
+};
 
-function load(){
-  try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
-  catch(e){ return []; }
-}
-function persist(){ localStorage.setItem(STORE_KEY, JSON.stringify(records)); }
-function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+/* ---- state ---- */
+let MASTER = loadMaster();
+let session = loadJSON(LS.SESSION, null);
+let outbox  = loadJSON(LS.OUTBOX, []);
+let backendUrl = localStorage.getItem(LS.URL) || '';
+let navStack = [];
+let curPoint = null;
+let selected = {};     // machineId -> machine obj (picker)
+let details  = {};     // machineId -> {found:Set, repaired:Set, status, statusAuto, detail, note}
 
-/* ============================================================
-   Helpers
-   ============================================================ */
-function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
-function fmt(n){ return (Math.round(n*100)/100).toLocaleString('th-TH'); }
-function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function toast(msg, isErr){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
-  clearTimeout(t._t); t._t = setTimeout(()=>t.className='toast', 2600);
+/* ---- boot ---- */
+function loadMaster(){
+  const cached = loadJSON(LS.MASTER, null);
+  if(cached && cached.points) return cached;
+  try{ return JSON.parse(document.getElementById('seed-data').textContent); }
+  catch(e){ return {zones:[],types:[],symptoms:[],models:[],statuses:[],points:[],meta:{}}; }
 }
-function thaiDate(iso){
-  if(!iso) return "";
-  const [y,m,d] = iso.split('-');
-  return `${parseInt(d)} ${THAI_MONTHS_SHORT[parseInt(m)-1]} ${parseInt(y)+543}`;
-}
-function quarterOf(month){ return Math.floor((month-1)/3)+1; } // month 1-12
+function loadJSON(k,d){ try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d} }
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-/* ============================================================
-   Tabs
-   ============================================================ */
-document.querySelectorAll('.tab-btn').forEach(b=>{
-  b.onclick = ()=>{
-    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    document.getElementById('view-'+b.dataset.view).classList.add('active');
-    if(b.dataset.view==='list') renderList();
-    if(b.dataset.view==='report'){ buildReportSelectors(); }
-  };
-});
+/* ---- helpers ---- */
+const $ = id => document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function symName(code){const s=MASTER.symptoms.find(x=>x.code===code);return s?s.name:code}
+function typeName(code){const t=MASTER.types.find(x=>x.code===code);return t?t.name:code}
+function toast(msg,kind){const t=$('toast');t.textContent=msg;t.className='toast show '+(kind||'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600)}
+function online(){return navigator.onLine}
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function thaiDate(iso){if(!iso)return'';const[y,m,d]=iso.split('-');const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return`${+d} ${M[+m-1]} ${+y+543}`}
 
-/* ============================================================
-   Record form
-   ============================================================ */
-function saveRecord(e){
-  e.preventDefault();
-  const rec = {
-    id: document.getElementById('editId').value || uid(),
-    date: document.getElementById('f_date').value,
-    time: document.getElementById('f_time').value,
-    zone: document.getElementById('f_zone').value.trim(),
-    room: document.getElementById('f_room').value.trim(),
-    machine: document.getElementById('f_machine').value.trim(),
-    operator: document.getElementById('f_operator').value.trim(),
-    chemical: document.getElementById('f_chemical').value.trim(),
-    volume: num(document.getElementById('f_volume').value),
-    area: num(document.getElementById('f_area').value),
-    duration: num(document.getElementById('f_duration').value),
-    result: document.getElementById('f_result').value,
-    notes: document.getElementById('f_notes').value.trim(),
-  };
-  const editing = !!document.getElementById('editId').value;
-  if(editing){
-    const i = records.findIndex(r=>r.id===rec.id);
-    if(i>-1) records[i] = rec;
-    toast('แก้ไขข้อมูลเรียบร้อยแล้ว ✓');
-  }else{
-    records.push(rec);
-    toast('บันทึกข้อมูลเรียบร้อยแล้ว ✓');
-  }
-  persist();
-  resetForm();
-  refreshDatalists();
+/* ---- navigation ---- */
+const TITLES={'s-home':'บันทึกการซ่อม','s-points':'เลือกจุดติดตั้ง','s-machines':'เลือกเครื่อง',
+  's-detail':'กรอกรายละเอียด','s-history':'ประวัติเครื่อง','s-outbox':'รายการรอ sync','s-settings':'ตั้งค่า'};
+function show(id, push=true){
+  if(push && navStack[navStack.length-1]!==currentScreen()) navStack.push(currentScreen());
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+  $('ttl').innerHTML = TITLES[id]+'<small>QSNCC · เครื่องฆ่าเชื้อ</small>';
+  $('backBtn').classList.toggle('show', id!=='s-home');
+  $('abMachines').classList.toggle('show', id==='s-machines');
+  $('abDetail').classList.toggle('show', id==='s-detail');
+  window.scrollTo(0,0);
 }
+function currentScreen(){return document.querySelector('.screen.active').id}
+function goBack(){const p=navStack.pop()||'s-home';show(p,false)}
 
-function resetForm(){
-  document.getElementById('recordForm').reset();
-  document.getElementById('editId').value = '';
-  document.getElementById('formTitle').textContent = 'บันทึกการใช้งานใหม่';
-  document.getElementById('cancelEdit').style.display = 'none';
-  // default to today / now
-  const now = new Date();
-  document.getElementById('f_date').value = now.toISOString().slice(0,10);
-  document.getElementById('f_time').value = now.toTimeString().slice(0,5);
+/* ---- session ---- */
+function initSession(){
+  if(!session) session={date:todayISO(),round:autoRound(todayISO()),recorder:''};
+  $('sesDate').value=session.date;
+  $('sesRound').value=session.round;
+  $('sesRecorder').value=session.recorder;
+  renderProgress();
 }
+function autoRound(iso){return (+iso.slice(8,10))<=15?'R1':'R2'}
+function onSessionChange(){
+  session={date:$('sesDate').value||todayISO(),round:$('sesRound').value,recorder:$('sesRecorder').value.trim()};
+  save(LS.SESSION,session);
+  renderProgress();
+}
+function renderProgress(){
+  const cur=(session&&session.date&&session.round)?session.date+'|'+session.round:'';
+  const mine=outbox.filter(o=>o.periodKey===cur);
+  const pts=new Set(mine.map(o=>o.rec.pointCode));
+  $('stPoints').textContent=pts.size;
+  $('stMachines').textContent=mine.length;
+  $('stPending').textContent=outbox.filter(o=>o.status!=='synced').length;
+  $('roundLabel').textContent=session&&session.date?`${thaiDate(session.date)} · ${session.round}${session.recorder?' · '+session.recorder:''}`:'—';
+  $('outboxLabel').textContent=outbox.filter(o=>o.status!=='synced').length+' รายการรอส่ง';
+  $('pointCountLabel').textContent=(MASTER.points.length||0)+' จุด · '+(MASTER.meta.machineCount||countMachines())+' เครื่อง';
+}
+function countMachines(){return MASTER.points.reduce((s,p)=>s+p.machines.length,0)}
 
-function editRecord(id){
-  const r = records.find(x=>x.id===id); if(!r) return;
-  document.getElementById('editId').value = r.id;
-  document.getElementById('f_date').value = r.date;
-  document.getElementById('f_time').value = r.time;
-  document.getElementById('f_zone').value = r.zone;
-  document.getElementById('f_room').value = r.room;
-  document.getElementById('f_machine').value = r.machine;
-  document.getElementById('f_operator').value = r.operator;
-  document.getElementById('f_chemical').value = r.chemical;
-  document.getElementById('f_volume').value = r.volume||'';
-  document.getElementById('f_area').value = r.area||'';
-  document.getElementById('f_duration').value = r.duration||'';
-  document.getElementById('f_result').value = r.result;
-  document.getElementById('f_notes').value = r.notes;
-  document.getElementById('formTitle').textContent = 'แก้ไขข้อมูลการใช้งาน';
-  document.getElementById('cancelEdit').style.display = 'inline-flex';
-  // switch to record tab
-  document.querySelector('.tab-btn[data-view="record"]').click();
-  window.scrollTo({top:0,behavior:'smooth'});
+/* ---- points ---- */
+function openPoints(){
+  if(!session||!session.recorder){toast('กรุณากรอกชื่อผู้บันทึกก่อน','err');$('sesRecorder').focus();return}
+  show('s-points');renderPoints();
 }
+function renderPoints(){
+  const q=($('pointSearch').value||'').trim().toLowerCase();
+  const recordedToday={};
+  outbox.forEach(o=>{if(o.rec.date===session.date)recordedToday[o.rec.pointCode]=(recordedToday[o.rec.pointCode]||0)+1});
+  const list=MASTER.points.filter(p=>{
+    if(!q)return true;
+    return (p.code+' '+p.zname+' '+p.remark+' '+p.sub).toLowerCase().includes(q);
+  });
+  $('pointList').innerHTML = list.length? list.map(p=>`
+    <button class="tile" onclick="openMachines('${esc(p.code)}')">
+      <div class="ic">${zoneIcon(p.zone)}</div>
+      <div class="tx">
+        <b>${esc(p.code)} ${recordedToday[p.code]?'<span class="badge cnt">บันทึกแล้ว '+recordedToday[p.code]+'</span>':''}</b>
+        <span>${esc(p.zname)}${p.remark?' · '+esc(p.remark):''} · ${p.machines.length} เครื่อง</span>
+      </div><div class="arrow">›</div>
+    </button>`).join('') : '<div class="empty">ไม่พบจุดที่ค้นหา</div>';
+}
+function zoneIcon(z){return {T:'🅣',R:'🅡',L:'🅛',Y:'🅨'}[z]||'📍'}
 
-function deleteRecord(id){
-  if(!confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) return;
-  records = records.filter(r=>r.id!==id);
-  persist(); renderList(); refreshDatalists();
-  toast('ลบข้อมูลแล้ว');
+/* ---- machines ---- */
+function openMachines(code){
+  curPoint=MASTER.points.find(p=>p.code===code);
+  if(!curPoint)return;
+  selected={};
+  show('s-machines');
+  renderMachines();
 }
-
-/* datalists for quick entry */
-function refreshDatalists(){
-  const fill = (id, key)=>{
-    const vals = [...new Set(records.map(r=>r[key]).filter(Boolean))].sort();
-    document.getElementById(id).innerHTML = vals.map(v=>`<option value="${esc(v)}">`).join('');
-  };
-  fill('zoneList','zone'); fill('machineList','machine');
-  fill('operatorList','operator'); fill('chemList','chemical');
-}
-
-/* ============================================================
-   List view
-   ============================================================ */
-function clearFilters(){
-  document.getElementById('searchBox').value='';
-  document.getElementById('filterMonth').value='';
-  document.getElementById('filterResult').value='';
-  renderList();
-}
-
-function getFiltered(){
-  const q = document.getElementById('searchBox').value.trim().toLowerCase();
-  const mo = document.getElementById('filterMonth').value; // YYYY-MM
-  const res = document.getElementById('filterResult').value;
-  return records.filter(r=>{
-    if(mo && !(r.date||'').startsWith(mo)) return false;
-    if(res && r.result!==res) return false;
-    if(q){
-      const hay = [r.zone,r.room,r.machine,r.operator,r.chemical,r.notes].join(' ').toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
-    return true;
-  }).sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
-}
-
-function renderList(){
-  const rows = getFiltered();
-  const body = document.getElementById('listBody');
-  if(!rows.length){
-    body.innerHTML = `<tr><td colspan="11"><div class="empty">ยังไม่มีข้อมูล — เริ่มบันทึกที่แท็บ “บันทึกข้อมูล”</div></td></tr>`;
-  }else{
-    body.innerHTML = rows.map(r=>`
-      <tr>
-        <td>${thaiDate(r.date)}</td>
-        <td>${esc(r.time)}</td>
-        <td><strong>${esc(r.zone)}</strong>${r.room?'<br><span style="color:var(--muted)">'+esc(r.room)+'</span>':''}</td>
-        <td>${esc(r.machine)}</td>
-        <td>${esc(r.operator)}</td>
-        <td>${esc(r.chemical)||'-'}</td>
-        <td>${r.volume?fmt(r.volume)+' มล.':'-'}</td>
-        <td>${r.area?fmt(r.area)+' ตร.ม.':'-'}</td>
-        <td>${r.duration?fmt(r.duration):'-'}</td>
-        <td><span class="tag ${r.result==='ปกติ'?'ok':'warn'}">${esc(r.result)}</span></td>
-        <td>
-          <div class="row-actions">
-            <button class="icon-btn" title="แก้ไข" onclick="editRecord('${r.id}')">✏️</button>
-            <button class="icon-btn" title="ลบ" onclick="deleteRecord('${r.id}')">🗑️</button>
-          </div>
-        </td>
-      </tr>`).join('');
-  }
-  document.getElementById('listCount').textContent =
-    `แสดง ${rows.length.toLocaleString('th-TH')} รายการ (ทั้งหมด ${records.length.toLocaleString('th-TH')} รายการ)`;
-}
-
-/* ============================================================
-   CSV export / JSON backup
-   ============================================================ */
-const CSV_COLS = [
-  ['date','วันที่'],['time','เวลา'],['zone','อาคาร/โซน'],['room','จุด/ห้อง'],
-  ['machine','หมายเลขเครื่อง'],['operator','ผู้ปฏิบัติงาน'],['chemical','น้ำยา'],
-  ['volume','ปริมาณ(มล.)'],['area','พื้นที่(ตร.ม.)'],['duration','ระยะเวลา(นาที)'],
-  ['result','ผลตรวจ'],['notes','หมายเหตุ']
-];
-function exportCSV(){
-  const rows = getFiltered();
-  if(!rows.length){ toast('ไม่มีข้อมูลให้ส่งออก', true); return; }
-  const head = CSV_COLS.map(c=>c[1]).join(',');
-  const lines = rows.map(r=> CSV_COLS.map(c=>{
-    const v = String(r[c[0]]??'');
-    return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
-  }).join(','));
-  const csv = '﻿' + head + '\n' + lines.join('\n');
-  download(new Blob([csv],{type:'text/csv;charset=utf-8'}), `disinfection_${today()}.csv`);
-  toast('ส่งออก CSV แล้ว ✓');
-}
-function exportBackup(){
-  download(new Blob([JSON.stringify(records,null,2)],{type:'application/json'}),
-    `qsncc_backup_${today()}.json`);
-  toast('สำรองข้อมูลแล้ว ✓');
-}
-function importBackup(e){
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const data = JSON.parse(reader.result);
-      if(!Array.isArray(data)) throw 0;
-      if(!confirm(`นำเข้า ${data.length} รายการ? ข้อมูลจะถูกเพิ่มต่อจากของเดิม`)) return;
-      // ensure ids
-      data.forEach(d=>{ if(!d.id) d.id=uid(); });
-      records = records.concat(data);
-      persist(); refreshDatalists(); renderList();
-      toast('นำเข้าข้อมูลแล้ว ✓');
-    }catch(err){ toast('ไฟล์ไม่ถูกต้อง', true); }
-  };
-  reader.readAsText(file);
-  e.target.value='';
-}
-function download(blob, name){
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download=name; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-function today(){ return new Date().toISOString().slice(0,10); }
-
-/* ============================================================
-   Reports
-   ============================================================ */
-function buildReportSelectors(){
-  const years = [...new Set(records.map(r=>(r.date||'').slice(0,4)).filter(Boolean))];
-  const nowY = new Date().getFullYear().toString();
-  if(!years.includes(nowY)) years.push(nowY);
-  years.sort((a,b)=>b-a);
-  const ySel = document.getElementById('reportYear');
-  ySel.innerHTML = years.map(y=>`<option value="${y}">${parseInt(y)+543} (${y})</option>`).join('');
-  const mSel = document.getElementById('reportMonth');
-  mSel.innerHTML = THAI_MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
-  mSel.value = new Date().getMonth()+1;
-}
-function onReportTypeChange(){
-  const t = document.getElementById('reportType').value;
-  document.getElementById('wrapYear').style.display   = (t==='session') ? 'none':'flex';
-  document.getElementById('wrapMonth').style.display  = (t==='month') ? 'flex':'none';
-  document.getElementById('wrapQuarter').style.display= (t==='quarter') ? 'flex':'none';
-}
-
-function statCard(label, value, unit){
-  return `<div class="stat"><div class="label">${label}</div>
-    <div class="value">${value}<span class="unit">${unit||''}</span></div></div>`;
-}
-function aggregate(rows){
-  return {
-    count: rows.length,
-    volume: rows.reduce((s,r)=>s+num(r.volume),0),
-    area: rows.reduce((s,r)=>s+num(r.area),0),
-    duration: rows.reduce((s,r)=>s+num(r.duration),0),
-    machines: new Set(rows.map(r=>r.machine).filter(Boolean)).size,
-    operators: new Set(rows.map(r=>r.operator).filter(Boolean)).size,
-    issues: rows.filter(r=>r.result==='พบปัญหา').length,
-  };
-}
-function statBlock(a){
-  return `<div class="stats">
-    ${statCard('จำนวนครั้งที่พ่น', a.count.toLocaleString('th-TH'), 'ครั้ง')}
-    ${statCard('ปริมาณน้ำยารวม', fmt(a.volume), 'มล.')}
-    ${statCard('พื้นที่รวม', fmt(a.area), 'ตร.ม.')}
-    ${statCard('เวลารวม', fmt(a.duration), 'นาที')}
-    ${statCard('เครื่องที่ใช้', a.machines, 'เครื่อง')}
-    ${statCard('ผู้ปฏิบัติงาน', a.operators, 'คน')}
-    ${statCard('พบปัญหา', a.issues.toLocaleString('th-TH'), 'ครั้ง')}
-  </div>`;
-}
-function barChart(title, pairs){ // pairs: [label, value]
-  if(!pairs.length) return '';
-  const max = Math.max(...pairs.map(p=>p[1]),1);
-  return `<div class="card"><h2>${title}</h2><div class="bars">${
-    pairs.map(([l,v])=>`<div class="bar-row">
-      <div>${esc(l)}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(1)}%"></div></div>
-      <div class="bar-val">${v.toLocaleString('th-TH')}</div>
-    </div>`).join('')
-  }</div></div>`;
-}
-function groupCount(rows, key){
-  const m = {};
-  rows.forEach(r=>{ const k=r[key]||'(ไม่ระบุ)'; m[k]=(m[k]||0)+1; });
-  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
-}
-
-function detailTable(rows){
-  if(!rows.length) return `<div class="card"><div class="empty">ไม่มีข้อมูลในช่วงเวลานี้</div></div>`;
-  const sorted = [...rows].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-  return `<div class="card"><h2>รายละเอียดการปฏิบัติงาน</h2>
-    <div class="table-wrap"><table>
-      <thead><tr><th>วันที่</th><th>เวลา</th><th>โซน/จุด</th><th>เครื่อง</th>
-        <th>ผู้ปฏิบัติงาน</th><th>น้ำยา</th><th>ปริมาณ</th><th>พื้นที่</th><th>ผล</th></tr></thead>
-      <tbody>${sorted.map(r=>`<tr>
-        <td>${thaiDate(r.date)}</td><td>${esc(r.time)}</td>
-        <td>${esc(r.zone)}${r.room?' / '+esc(r.room):''}</td>
-        <td>${esc(r.machine)}</td><td>${esc(r.operator)}</td>
-        <td>${esc(r.chemical)||'-'}</td><td>${r.volume?fmt(r.volume):'-'}</td>
-        <td>${r.area?fmt(r.area):'-'}</td>
-        <td><span class="tag ${r.result==='ปกติ'?'ok':'warn'}">${esc(r.result)}</span></td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`;
-}
-
-function generateReport(){
-  const type = document.getElementById('reportType').value;
-  const year = document.getElementById('reportYear').value;
-  let rows, title, subtitle, breakdown='';
-
-  if(type==='session'){
-    rows = [...records];
-    title = 'รายงานรายครั้ง (ทั้งหมด)';
-    subtitle = 'รายการปฏิบัติงานพ่นฆ่าเชื้อทุกครั้งที่บันทึกไว้';
-  }
-  else if(type==='month'){
-    const mo = parseInt(document.getElementById('reportMonth').value);
-    const pref = `${year}-${String(mo).padStart(2,'0')}`;
-    rows = records.filter(r=>(r.date||'').startsWith(pref));
-    title = `รายงานประจำเดือน ${THAI_MONTHS[mo-1]} ${parseInt(year)+543}`;
-    subtitle = `สรุปการปฏิบัติงานระหว่างวันที่ 1–สิ้นเดือน`;
-    // breakdown by day
-    const days = {};
-    rows.forEach(r=>{ const d=parseInt((r.date||'').slice(8,10)); days[d]=(days[d]||0)+1; });
-    breakdown = barChart('จำนวนครั้งต่อวัน', Object.entries(days)
-      .sort((a,b)=>a[0]-b[0]).map(([d,v])=>['วันที่ '+d, v]));
-  }
-  else if(type==='quarter'){
-    const q = parseInt(document.getElementById('reportQuarter').value);
-    rows = records.filter(r=>{
-      if(!(r.date||'').startsWith(year)) return false;
-      return quarterOf(parseInt(r.date.slice(5,7)))===q;
+function renderMachines(){
+  const p=curPoint;
+  $('pointHead').innerHTML=`<h2>${esc(p.code)}</h2><div class="sub">${esc(p.zname)}${p.remark?' · '+esc(p.remark):''} · ${p.machines.length} เครื่อง</div>`;
+  const recordedToday=new Set(outbox.filter(o=>o.rec.date===session.date).map(o=>o.rec.machineId));
+  const byType={};
+  p.machines.forEach(m=>{(byType[m.type]||(byType[m.type]=[])).push(m)});
+  const order=['S','U','F','D'];
+  let html='';
+  order.concat(Object.keys(byType).filter(t=>!order.includes(t))).forEach(t=>{
+    if(!byType[t])return;
+    html+=`<div class="grp-title"><span>${esc(typeName(t))}</span><span class="badge cnt">${byType[t].length}</span><div class="line"></div></div><div class="mgrid">`;
+    byType[t].forEach(m=>{
+      const sel=selected[m.id]?'sel':'';
+      const done=recordedToday.has(m.id)?'done':'';
+      html+=`<button class="mcell ${sel} ${done}" onclick="toggleMachine('${esc(m.id)}')">
+        ${done?'<span class="dupflag">วันนี้</span>':''}
+        ${esc(t)}${esc(m.num)}<small>${esc(m.id)}</small></button>`;
     });
-    const qm = {1:[0,1,2],2:[3,4,5],3:[6,7,8],4:[9,10,11]}[q];
-    title = `รายงานประจำไตรมาสที่ ${q} ปี ${parseInt(year)+543}`;
-    subtitle = `เดือน ${qm.map(i=>THAI_MONTHS[i]).join(' – ')}`;
-    const byMonth = {};
-    rows.forEach(r=>{ const m=parseInt(r.date.slice(5,7)); byMonth[m]=(byMonth[m]||0)+1; });
-    breakdown = barChart('จำนวนครั้งต่อเดือน', qm.map(i=>[THAI_MONTHS[i], byMonth[i+1]||0]));
-  }
-  else{ // year
-    rows = records.filter(r=>(r.date||'').startsWith(year));
-    title = `รายงานประจำปี ${parseInt(year)+543}`;
-    subtitle = `สรุปการปฏิบัติงานตลอดทั้งปี (${year})`;
-    const byMonth = {};
-    rows.forEach(r=>{ const m=parseInt(r.date.slice(5,7)); byMonth[m]=(byMonth[m]||0)+1; });
-    breakdown = barChart('จำนวนครั้งต่อเดือน',
-      THAI_MONTHS.map((mn,i)=>[mn, byMonth[i+1]||0]));
-  }
-
-  const a = aggregate(rows);
-  const zoneChart = barChart('จำนวนครั้งแยกตามโซน (สูงสุด 10 อันดับ)', groupCount(rows,'zone').slice(0,10));
-  const machineChart = barChart('การใช้งานแยกตามเครื่อง', groupCount(rows,'machine').slice(0,10));
-
-  const html = `
-    <div class="card">
-      <h2>${title}</h2>
-      <div class="sub">${subtitle} · จัดทำเมื่อ ${thaiDate(today())}</div>
-    </div>
-    <div class="card">
-      <h2>สรุปภาพรวม</h2>
-      ${statBlock(a)}
-    </div>
-    ${breakdown}
-    ${zoneChart}
-    ${machineChart}
-    ${detailTable(rows)}
-  `;
-  document.getElementById('reportOutput').innerHTML = html;
-  // mirror into print area
-  document.getElementById('print-only').innerHTML =
-    `<h1 style="text-align:center">ระบบบันทึกการใช้งานเครื่องพ่นฆ่าเชื้อ · QSNCC</h1>` + html;
-  if(!rows.length) toast('ไม่พบข้อมูลในช่วงเวลาที่เลือก', true);
+    html+='</div>';
+  });
+  $('machineGroups').innerHTML=html;
+  updateSelBar();
+}
+function toggleMachine(id){
+  const m=curPoint.machines.find(x=>x.id===id);
+  if(selected[id])delete selected[id];else selected[id]=m;
+  renderMachines();
+}
+function updateSelBar(){
+  const n=Object.keys(selected).length;
+  $('selCount').textContent=n;
+  $('toDetailBtn').disabled=n===0;
+  $('toDetailBtn').style.opacity=n?1:.6;
 }
 
-/* ============================================================
-   Init
-   ============================================================ */
-resetForm();
-refreshDatalists();
-renderList();
-buildReportSelectors();
-onReportTypeChange();
+/* ---- detail ---- */
+function openDetail(){
+  const ids=Object.keys(selected);
+  if(!ids.length)return;
+  ids.forEach(id=>{ if(!details[id]) details[id]={found:new Set(),repaired:new Set(),status:'',statusAuto:true,detail:'',note:''} });
+  // drop details for deselected
+  Object.keys(details).forEach(id=>{if(!selected[id])delete details[id]});
+  show('s-detail');
+  renderDetail();
+}
+function renderDetail(){
+  const ids=Object.keys(selected);
+  $('saveCount').textContent=ids.length;
+  $('detailList').innerHTML=ids.map(id=>{
+    const m=selected[id],d=details[id];
+    const st=statusClass(computeStatus(d));
+    return `<details class="mdetail" open>
+      <summary>${esc(id)} <span class="st ${st.cls}">${esc(st.label)}</span></summary>
+      <div class="body">
+        <div class="mini-label">อาการที่พบ</div>
+        <div class="chips">${MASTER.symptoms.map(s=>`
+          <button class="chip ${d.found.has(s.code)?'on':''}" onclick="toggleFound('${id}','${s.code}')">${esc(s.name)}</button>`).join('')}</div>
+
+        <div class="mini-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>อาการที่ซ่อมเสร็จ</span>
+          ${d.found.size?`<span class="link" onclick="repairAll('${id}')">ซ่อมครบ ✓</span>`:''}
+        </div>
+        <div class="chips">${MASTER.symptoms.map(s=>`
+          <button class="chip rep ${d.repaired.has(s.code)?'on':''}" ${d.found.has(s.code)?'':'disabled'} onclick="toggleRepaired('${id}','${s.code}')">${esc(s.name)}</button>`).join('')||'<span style="color:var(--muted);font-size:13px">เลือกอาการที่พบก่อน</span>'}</div>
+
+        ${pendingHtml(d)}
+
+        <div class="mini-label">สถานะ</div>
+        <select onchange="setStatus('${id}',this.value)">
+          ${MASTER.statuses.map(s=>`<option value="${esc(s)}" ${computeStatus(d)===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+
+        <div class="mini-label">รายละเอียด / การซ่อม (ถ้ามี)</div>
+        <textarea placeholder="เช่น เปลี่ยนหัววงจร, รออะไหล่ฝาหน้า" oninput="setField('${id}','detail',this.value)">${esc(d.detail)}</textarea>
+        <div class="mini-label">หมายเหตุ</div>
+        <input type="text" value="${esc(d.note)}" placeholder="หมายเหตุเพิ่มเติม" oninput="setField('${id}','note',this.value)" />
+      </div>
+    </details>`;
+  }).join('');
+}
+function pendingHtml(d){
+  const pend=[...d.found].filter(c=>!d.repaired.has(c));
+  if(!d.found.size)return'';
+  if(!pend.length)return`<div class="banner ok" style="margin:12px 0 0">ซ่อมครบทุกอาการ ✓</div>`;
+  return`<div class="banner warn" style="margin:12px 0 0">ค้าง: ${pend.map(symName).map(esc).join(', ')}</div>`;
+}
+function toggleFound(id,code){
+  const d=details[id];
+  if(d.found.has(code)){d.found.delete(code);d.repaired.delete(code)}else d.found.add(code);
+  renderDetail();
+}
+function toggleRepaired(id,code){
+  const d=details[id];
+  if(!d.found.has(code))return;
+  d.repaired.has(code)?d.repaired.delete(code):d.repaired.add(code);
+  renderDetail();
+}
+function repairAll(id){const d=details[id];d.repaired=new Set(d.found);renderDetail()}
+function setStatus(id,v){details[id].status=v;details[id].statusAuto=false}
+function setField(id,f,v){details[id][f]=v}
+function computeStatus(d){
+  if(!d.statusAuto&&d.status)return d.status;
+  const found=d.found.size,pend=[...d.found].filter(c=>!d.repaired.has(c)).length,rep=found-pend;
+  if(found===0)return 'เสร็จสิ้น';
+  if(pend===0)return 'เสร็จสิ้น';
+  if(rep>0)return 'เสร็จบางส่วน';
+  return 'รออะไหล่';
+}
+function statusClass(s){
+  if(s==='เสร็จสิ้น')return{cls:'ok',label:s};
+  if(s==='เสร็จบางส่วน')return{cls:'warn',label:s};
+  if(s==='ยกเลิก')return{cls:'none',label:s};
+  return{cls:'pending',label:s};
+}
+
+/* ---- save (batch → outbox → sync) ---- */
+function saveAll(){
+  const ids=Object.keys(selected);
+  if(!ids.length)return;
+  const periodKey=session.date+'|'+session.round;
+  const dups=[];
+  const newItems=ids.map(id=>{
+    const m=selected[id],d=details[id];
+    const found=[...d.found].map(c=>({code:c,name:symName(c)}));
+    if(!found.length)return null;
+    const repaired=[...d.repaired].map(c=>({code:c,name:symName(c)}));
+    const pending=[...d.found].filter(c=>!d.repaired.has(c)).map(c=>({code:c,name:symName(c)}));
+    if(outbox.some(o=>o.rec.machineId===id&&o.rec.date===session.date))dups.push(id);
+    return {
+      id:'ob_'+Date.now()+'_'+id, status:'pending', periodKey,
+      rec:{
+        date:session.date, round:session.date.slice(0,7)+'-'+session.round, recorder:session.recorder,
+        pointCode:m.pointCode||curPoint.code, zone:curPoint.zone, zoneName:curPoint.zname,
+        machineId:id, num:m.num, typeName:typeName(m.type),
+        found, repaired, pending, status:computeStatus(d), detail:d.detail, note:d.note
+      }
+    };
+  }).filter(Boolean);
+
+  if(!newItems.length){toast('ยังไม่ได้เลือกอาการที่พบของเครื่องใด','err');return}
+  const missing=ids.filter(id=>!details[id].found.size);
+  if(missing.length){
+    if(!confirm(`มี ${missing.length} เครื่องที่ยังไม่เลือกอาการ จะถูกข้าม — บันทึกเฉพาะเครื่องที่กรอกครบ?`))return;
+  }
+  if(dups.length){
+    if(!confirm(`เครื่อง ${dups.join(', ')} เคยบันทึกในวันที่นี้แล้ว — ต้องการบันทึกซ้ำหรือไม่?`))return;
+  }
+  outbox=outbox.concat(newItems);
+  save(LS.OUTBOX,outbox);
+  rememberRecorder(session.recorder);
+  selected={};details={};
+  toast(`บันทึก ${newItems.length} รายการแล้ว`,'ok');
+  renderProgress();
+  syncNow(true);
+  show('s-home',false);navStack=[];
+}
+function rememberRecorder(name){
+  if(!name)return;
+  let rs=loadJSON(LS.RECORDERS,[]);
+  if(!rs.includes(name)){rs.push(name);save(LS.RECORDERS,rs);fillRecorders()}
+}
+
+/* ---- sync ---- */
+async function syncNow(silent){
+  const pend=outbox.filter(o=>o.status!=='synced');
+  if(!pend.length){if(!silent)toast('ไม่มีรายการรอส่ง');return}
+  if(!backendUrl){if(!silent)toast('ยังไม่ได้ตั้งค่า Web App URL','err');updateSyncBanner();return}
+  if(!online()){if(!silent)toast('ออฟไลน์ — จะส่งอัตโนมัติเมื่อมีสัญญาณ','err');updateSyncBanner();return}
+  if(!silent)toast('กำลังส่ง...');
+  try{
+    const res=await fetch(backendUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({records:pend.map(o=>o.rec)})});
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error||'server error');
+    pend.forEach(o=>o.status='synced');
+    save(LS.OUTBOX,outbox);
+    toast(`ส่งขึ้น Sheets แล้ว ${data.result.written} รายการ`+(data.result.skipped?` (ข้ามซ้ำ ${data.result.skipped})`:''),'ok');
+  }catch(err){
+    pend.forEach(o=>{if(o.status!=='synced')o.status='pending'});
+    save(LS.OUTBOX,outbox);
+    if(!silent)toast('ส่งไม่สำเร็จ: '+err.message,'err');
+  }
+  renderProgress();updateSyncBanner();renderOutbox();
+}
+function updateSyncBanner(){
+  const n=outbox.filter(o=>o.status!=='synced').length;
+  const b=$('syncBanner');
+  if(!n){b.innerHTML='';return}
+  b.innerHTML=`<div class="banner warn">☁️ มี ${n} รายการรอส่งขึ้น Google Sheets
+    <span class="link" onclick="syncNow()">ส่งเดี๋ยวนี้</span></div>`;
+}
+
+/* ---- outbox screen ---- */
+function renderOutbox(){
+  const pend=outbox.filter(o=>o.status!=='synced').length;
+  const done=outbox.length-pend;
+  $('outboxSummary').innerHTML=`<div class="card"><h2>สถานะการส่งข้อมูล</h2>
+    <div class="stat-row"><div class="stat"><div class="v">${pend}</div><div class="l">รอส่ง</div></div>
+    <div class="stat"><div class="v">${done}</div><div class="l">ส่งแล้ว</div></div>
+    <div class="stat"><div class="v">${online()?'●':'○'}</div><div class="l">${online()?'ออนไลน์':'ออฟไลน์'}</div></div></div></div>`;
+  const list=[...outbox].reverse();
+  $('outboxList').innerHTML=list.length?list.map(o=>`
+    <div class="out-item"><div class="dot ${o.status}"></div>
+      <div class="tx"><b>${esc(o.rec.machineId)}</b>
+        <span>${thaiDate(o.rec.date)} · ${esc(o.rec.status)} · พบ ${o.rec.found.length} / ซ่อม ${o.rec.repaired.length}</span></div>
+      <span class="badge ${o.status==='synced'?'cnt':'zone'}">${o.status==='synced'?'ส่งแล้ว':'รอส่ง'}</span>
+    </div>`).join(''):'<div class="empty">ยังไม่มีรายการ</div>';
+}
+function clearSynced(){
+  outbox=outbox.filter(o=>o.status!=='synced');
+  save(LS.OUTBOX,outbox);renderOutbox();renderProgress();updateSyncBanner();
+  toast('ล้างรายการที่ส่งแล้ว');
+}
+
+/* ---- history ---- */
+function loadHistoryScreen(){fillMachineIds()}
+async function loadHistory(){
+  const id=$('histId').value.trim();
+  if(!id){toast('กรอก Machine ID','err');return}
+  const local=outbox.filter(o=>o.rec.machineId===id).map(o=>({
+    date:o.rec.date,round:o.rec.round,found:o.rec.found.map(s=>s.code+' '+s.name).join(', '),
+    repaired:o.rec.repaired.map(s=>s.name).join(', '),pending:o.rec.pending.map(s=>s.name).join(', '),
+    status:o.rec.status,recorder:o.rec.recorder,note:o.rec.note,local:true
+  }));
+  let server=[];
+  if(backendUrl&&online()){
+    $('histResult').innerHTML='<div class="empty">กำลังโหลด...</div>';
+    try{
+      const res=await fetch(backendUrl+'?action=history&machineId='+encodeURIComponent(id));
+      const data=await res.json();
+      if(data.ok)server=data.history||[];
+    }catch(e){/* offline fallback */}
+  }
+  const all=[...local,...server].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  $('histResult').innerHTML=all.length?all.map(h=>`
+    <div class="hist"><div class="h"><span>${thaiDate((h.date||'').slice(0,10))} · ${esc(h.round||'')}</span>
+      <span>${h.local?'📱 ในเครื่อง':'☁️ Sheets'}</span></div>
+      <div><b>สถานะ:</b> ${esc(h.status||'-')}</div>
+      <div style="font-size:14px;color:#334155"><b>พบ:</b> ${esc(h.found||'-')}</div>
+      ${h.repaired?`<div style="font-size:14px;color:#15803d"><b>ซ่อมเสร็จ:</b> ${esc(h.repaired)}</div>`:''}
+      ${h.pending?`<div style="font-size:14px;color:#b45309"><b>ค้าง:</b> ${esc(h.pending)}</div>`:''}
+      ${h.note?`<div style="font-size:13px;color:var(--muted)">หมายเหตุ: ${esc(h.note)}</div>`:''}
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">ผู้บันทึก: ${esc(h.recorder||'-')}</div>
+    </div>`).join(''):'<div class="empty">ไม่พบประวัติของเครื่องนี้</div>';
+}
+
+/* ---- settings / master refresh ---- */
+function saveConfig(){
+  backendUrl=$('cfgUrl').value.trim();
+  localStorage.setItem(LS.URL,backendUrl);
+  updateConnLabel();
+  if(backendUrl)refreshMaster();else $('cfgStatus').innerHTML='<div class="banner warn">ลบ URL แล้ว — ใช้ข้อมูลตั้งต้นออฟไลน์</div>';
+}
+async function refreshMaster(){
+  if(!backendUrl){$('cfgStatus').innerHTML='<div class="banner warn">ยังไม่ได้ใส่ URL</div>';return}
+  $('cfgStatus').innerHTML='<div class="banner info">กำลังเชื่อมต่อ...</div>';
+  try{
+    const res=await fetch(backendUrl+'?action=master');
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error||'error');
+    MASTER=data.data;save(LS.MASTER,MASTER);
+    afterMasterLoad();
+    $('cfgStatus').innerHTML=`<div class="banner ok">เชื่อมต่อสำเร็จ · โหลด ${MASTER.points.length} จุด / ${MASTER.meta.machineCount} เครื่อง</div>`;
+    toast('อัปเดตทะเบียนล่าสุดแล้ว','ok');
+  }catch(err){
+    $('cfgStatus').innerHTML=`<div class="banner warn">เชื่อมต่อไม่ได้: ${esc(err.message)} — ใช้ข้อมูลแคชต่อไป</div>`;
+  }
+}
+function updateConnLabel(){$('connLabel').textContent=backendUrl?'เชื่อมต่อแล้ว':'ยังไม่เชื่อมต่อ (ออฟไลน์)'}
+function updateMasterMeta(){
+  $('masterMeta').textContent=`${MASTER.points.length} จุด · ${MASTER.meta.machineCount||countMachines()} เครื่อง · ${MASTER.symptoms.length} อาการ · ${MASTER.zones.length} โซน`;
+}
+
+/* ---- datalists ---- */
+function fillRecorders(){
+  const rs=loadJSON(LS.RECORDERS,[]);
+  $('recorderList').innerHTML=rs.map(r=>`<option value="${esc(r)}">`).join('');
+}
+function fillMachineIds(){
+  const ids=[];MASTER.points.forEach(p=>p.machines.forEach(m=>ids.push(m.id)));
+  $('machineIdList').innerHTML=ids.slice(0,1600).map(i=>`<option value="${esc(i)}">`).join('');
+}
+
+/* ---- init ---- */
+function afterMasterLoad(){renderProgress();updateMasterMeta();fillMachineIds()}
+function boot(){
+  initSession();
+  fillRecorders();
+  $('cfgUrl').value=backendUrl;
+  updateConnLabel();updateMasterMeta();updateSyncBanner();fillMachineIds();
+  // auto pull latest registry if connected
+  if(backendUrl&&online())refreshMaster();
+}
+window.addEventListener('online',()=>{$('netdot').classList.add('online');updateSyncBanner();syncNow(true)});
+window.addEventListener('offline',()=>{$('netdot').classList.remove('online');updateSyncBanner()});
+$('netdot').classList.toggle('online',online());
+boot();
 </script>
 </body>
 </html>
