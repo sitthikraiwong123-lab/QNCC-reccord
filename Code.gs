@@ -39,7 +39,11 @@ function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || '';
   try {
     if (action === 'ping')    return json({ ok: true, ts: new Date().toISOString() });
-    if (action === 'history') return json({ ok: true, history: getHistory(e.parameter.machineId) });
+    if (action === 'history') return json({ ok: true, history: queryHistory({
+      zone:      e.parameter.zone      || '',
+      point:     e.parameter.point     || '',
+      machineId: e.parameter.machineId || ''
+    }) });
     if (action === 'master')  return json({ ok: true, data: getMasterData() });
     // Default: serve the app itself. Same-origin as the backend → no CORS, and the
     // client talks to the server via google.script.run (see index.html). This is the
@@ -257,29 +261,57 @@ function ensureExtraColumns(sh) {
 }
 
 /* ------------------------------------------------------------------ history */
-function getHistory(machineId) {
-  if (!machineId) return [];
+/**
+ * Repair history for any scope, narrowing from broad to specific:
+ *   {}                                → everything
+ *   {zone:'R'}                        → the whole zone
+ *   {zone:'R', point:'R-B101'}        → the whole point
+ *   {machineId:'R-B101-F6'}           → one machine
+ * Each filter is optional and simply ANDs with the others, so the caller can drill
+ * down one level at a time. Rows come back newest-first.
+ */
+function queryHistory(filter) {
+  filter = filter || {};
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEETS.LOG);
+  if (!sh) return [];
   var values = sh.getDataRange().getValues();
+  if (values.length < 2) return [];
   var header = values[0].map(function (h) { return String(h).trim(); });
   var i = {}; header.forEach(function (h, k) { i[h] = k; });
+
   var out = [];
   for (var r = 1; r < values.length; r++) {
-    if (String(values[r][i['Machine ID']]) !== String(machineId)) continue;
+    var row = values[r];
+    var mid = row[i['Machine ID']];
+    if (!mid) continue;
+    if (filter.machineId && String(mid) !== String(filter.machineId)) continue;
+    if (filter.point && String(row[i['รหัสจุด']]) !== String(filter.point)) continue;
+    if (filter.zone && String(row[i['โซน']]) !== String(filter.zone)) continue;
     out.push({
-      date:     fmtDate(values[r][i['วันที่']]),
-      round:    values[r][i['รอบ']],
-      found:    values[r][i['สรุปอาการ (รหัส+ชื่อ)']],
-      repaired: i['อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)'] != null ? values[r][i['อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)']] : '',
-      pending:  i['อาการที่ยังค้าง (รหัส+ชื่อ)']  != null ? values[r][i['อาการที่ยังค้าง (รหัส+ชื่อ)']]  : '',
-      status:   values[r][i['สถานะ']],
-      recorder: values[r][i['ผู้บันทึก']],
-      note:     values[r][i['หมายเหตุ']]
+      machineId: String(mid),
+      pointCode: row[i['รหัสจุด']],
+      zone:      row[i['โซน']],
+      zoneName:  row[i['ชื่อโซน']],
+      typeName:  row[i['ประเภทที่ใช้']],
+      date:      fmtDate(row[i['วันที่']]),
+      round:     row[i['รอบ']],
+      found:     row[i['สรุปอาการ (รหัส+ชื่อ)']],
+      repaired:  i['อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)'] != null ? row[i['อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)']] : '',
+      pending:   i['อาการที่ยังค้าง (รหัส+ชื่อ)']  != null ? row[i['อาการที่ยังค้าง (รหัส+ชื่อ)']]  : '',
+      status:    row[i['สถานะ']],
+      recorder:  row[i['ผู้บันทึก']],
+      note:      row[i['หมายเหตุ']]
     });
   }
   out.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
   return out;
+}
+
+/* Kept for callers that only need one machine. */
+function getHistory(machineId) {
+  if (!machineId) return [];
+  return queryHistory({ machineId: machineId });
 }
 
 /* ------------------------------------------------------------------ helpers */

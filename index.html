@@ -252,7 +252,7 @@
     </button>
     <button class="tile" onclick="show('s-history');loadHistoryScreen()">
       <div class="ic">🕘</div>
-      <div class="tx"><b>ประวัติการซ่อมต่อเครื่อง</b><span>ค้นด้วย Machine ID</span></div>
+      <div class="tx"><b>ประวัติการซ่อม</b><span>ดูทั้งโซน · ทั้งจุด · หรือรายเครื่อง</span></div>
       <div class="arrow">›</div>
     </button>
     <button class="tile" onclick="show('s-outbox');renderOutbox()">
@@ -294,12 +294,26 @@
   <!-- ============ HISTORY ============ -->
   <section class="screen" id="s-history">
     <div class="card">
-      <h2>ประวัติการซ่อมต่อเครื่อง</h2>
-      <div class="sub">พิมพ์ Machine ID เช่น R-B101-F6</div>
-      <div class="row" style="gap:8px">
-        <input type="text" id="histId" list="machineIdList" placeholder="Machine ID" />
-        <button class="btn btn-primary" style="width:auto;padding:13px 18px" onclick="loadHistory()">ค้นหา</button>
+      <h2>ประวัติการซ่อม</h2>
+      <div class="sub">เลือกขอบเขตจากกว้างไปแคบ — เลือกแค่โซนก็ได้ทั้งโซน เจาะลงจุด/เครื่องเพื่อดูเฉพาะส่วนนั้น</div>
+      <div class="field">
+        <label>1· โซน</label>
+        <select id="hZone" onchange="onScopeChange('zone')"></select>
       </div>
+      <div class="field">
+        <label>2· จุดติดตั้ง</label>
+        <select id="hPoint" onchange="onScopeChange('point')"></select>
+      </div>
+      <div class="field">
+        <label>3· เครื่อง</label>
+        <select id="hMachine" onchange="onScopeChange('machine')"></select>
+      </div>
+      <div class="field">
+        <label>หรือพิมพ์ Machine ID ตรง ๆ</label>
+        <input type="text" id="histId" list="machineIdList" placeholder="เช่น R-B101-F6" oninput="onScopeChange('text')" />
+      </div>
+      <button class="btn btn-primary" onclick="loadHistory()">🔍 ค้นหาประวัติ</button>
+      <div class="banner info" style="margin:12px 0 0" id="scopeHint">ขอบเขต: ทุกโซน</div>
     </div>
     <div id="histResult"></div>
   </section>
@@ -402,7 +416,11 @@ async function postJSON(url,body){const r=await fetch(url,{method:'POST',headers
 const api = {
   getMaster:      ()=> RUN ? gsRun('getMasterData')      : fetchJSON(backendUrl+'?action=master').then(d=>d.data),
   save:    (records)=> RUN ? gsRun('saveRecords',{records}) : postJSON(backendUrl,{records}).then(d=>d.result),
-  history:      (id)=> RUN ? gsRun('getHistory',id)      : fetchJSON(backendUrl+'?action=history&machineId='+encodeURIComponent(id)).then(d=>d.history),
+  /* filter: {zone?, point?, machineId?} — omit all for everything */
+  history:       (f)=> RUN ? gsRun('queryHistory',f||{})
+                           : fetchJSON(backendUrl+'?action=history&zone='+encodeURIComponent(f.zone||'')
+                               +'&point='+encodeURIComponent(f.point||'')
+                               +'&machineId='+encodeURIComponent(f.machineId||'')).then(d=>d.history),
 };
 let curPoint = null;
 let selected = {};     // machineId -> machine obj (picker)
@@ -463,7 +481,7 @@ applyFont();
 
 /* ---- navigation ---- */
 const TITLES={'s-home':'บันทึกการซ่อม','s-points':'เลือกจุดติดตั้ง','s-machines':'เลือกเครื่อง',
-  's-detail':'กรอกรายละเอียด','s-history':'ประวัติเครื่อง','s-outbox':'รายการรอ sync','s-settings':'ตั้งค่า'};
+  's-detail':'กรอกรายละเอียด','s-history':'ประวัติการซ่อม','s-outbox':'รายการรอ sync','s-settings':'ตั้งค่า'};
 function show(id, push=true){
   if(push && navStack[navStack.length-1]!==currentScreen()) navStack.push(currentScreen());
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -864,33 +882,129 @@ function clearSynced(){
   toast('ล้างรายการที่ส่งแล้ว');
 }
 
-/* ---- history ---- */
-function loadHistoryScreen(){fillMachineIds()}
+/* ---- history ----
+   Scope narrows one level at a time: zone → point → machine. Whatever level is set
+   is what gets pulled, so picking only a zone returns every record in that zone. */
+function loadHistoryScreen(){ fillMachineIds(); buildScopeSelectors(); }
+
+function buildScopeSelectors(){
+  const z=$('hZone');
+  const keep=z.value;
+  z.innerHTML='<option value="">ทุกโซน (ทั้งหมด)</option>'+
+    MASTER.zones.map(x=>`<option value="${esc(x.code)}">${esc(x.name)}</option>`).join('');
+  if(keep)z.value=keep;
+  buildPointOptions(); buildMachineOptions(); updateScopeHint();
+}
+function buildPointOptions(){
+  const zone=$('hZone').value, sel=$('hPoint'), keep=sel.value;
+  const pts=MASTER.points.filter(p=>!zone||p.zone===zone);
+  sel.innerHTML=`<option value="">${zone?'ทุกจุดในโซนนี้':'ทุกจุด'} (${pts.length} จุด)</option>`+
+    pts.map(p=>`<option value="${esc(p.code)}">${esc(p.code)}${p.remark?' · '+esc(p.remark):''}</option>`).join('');
+  sel.value=pts.some(p=>p.code===keep)?keep:'';
+}
+function buildMachineOptions(){
+  const pcode=$('hPoint').value, sel=$('hMachine'), keep=sel.value;
+  const p=MASTER.points.find(x=>x.code===pcode);
+  if(!p){ sel.innerHTML='<option value="">ทุกเครื่อง (เลือกจุดก่อนเพื่อเจาะรายเครื่อง)</option>'; sel.value=''; return }
+  sel.innerHTML=`<option value="">ทุกเครื่องในจุดนี้ (${p.machines.length} เครื่อง)</option>`+
+    p.machines.map(m=>`<option value="${esc(m.id)}">${esc(typeAbbr(m.type))} ${esc(m.num)} · ${esc(m.id)}</option>`).join('');
+  sel.value=p.machines.some(m=>m.id===keep)?keep:'';
+}
+function onScopeChange(level){
+  if(level==='zone'){ buildPointOptions(); buildMachineOptions(); }
+  if(level==='point'){ buildMachineOptions(); }
+  if(level==='machine'&&$('hMachine').value) $('histId').value='';
+  if(level==='text'&&$('histId').value.trim()){ $('hMachine').value=''; }
+  updateScopeHint();
+}
+/* the effective filter = the deepest level the user actually set */
+function currentScope(){
+  const typed=$('histId').value.trim();
+  if(typed) return {machineId:typed, label:'เครื่อง '+typed};
+  const mid=$('hMachine').value;
+  if(mid) return {machineId:mid, label:'เครื่อง '+mid};
+  const pt=$('hPoint').value;
+  if(pt) return {point:pt, label:'ทั้งจุด '+pt};
+  const z=$('hZone').value;
+  if(z){const zn=MASTER.zones.find(x=>x.code===z);return {zone:z, label:'ทั้งโซน '+(zn?zn.name:z)}}
+  return {label:'ทุกโซน (ทั้งหมด)'};
+}
+function updateScopeHint(){ $('scopeHint').textContent='ขอบเขต: '+currentScope().label }
+
+function matchesScope(rec,f){
+  if(f.machineId) return rec.machineId===f.machineId;
+  if(f.point)     return rec.pointCode===f.point;
+  if(f.zone)      return rec.zone===f.zone;
+  return true;
+}
 async function loadHistory(){
-  const id=$('histId').value.trim();
-  if(!id){toast('กรอก Machine ID','err');return}
-  const local=outbox.filter(o=>o.rec.machineId===id).map(o=>({
-    date:o.rec.date,round:o.rec.round,found:o.rec.found.map(s=>s.code+' '+s.name).join(', '),
-    repaired:o.rec.repaired.map(s=>s.name).join(', '),pending:o.rec.pending.map(s=>s.name).join(', '),
-    status:o.rec.status,recorder:o.rec.recorder,note:o.rec.note,local:true
+  const f=currentScope();
+  const local=outbox.filter(o=>matchesScope(o.rec,f)).map(o=>({
+    machineId:o.rec.machineId, pointCode:o.rec.pointCode, zone:o.rec.zone, zoneName:o.rec.zoneName,
+    date:o.rec.date, round:o.rec.round,
+    found:o.rec.found.map(s=>s.code+' '+s.name).join(', '),
+    repaired:o.rec.repaired.map(s=>s.name).join(', '),
+    pending:o.rec.pending.map(s=>s.name).join(', '),
+    status:o.rec.status, recorder:o.rec.recorder, note:o.rec.note, local:true
   }));
   let server=[];
   if((RUN||backendUrl)&&online()){
     $('histResult').innerHTML='<div class="empty">กำลังโหลด...</div>';
-    try{ server=await api.history(id)||[]; }catch(e){/* offline fallback */}
+    try{ server=await api.history({zone:f.zone||'',point:f.point||'',machineId:f.machineId||''})||[]; }
+    catch(e){ /* offline → local only */ }
   }
-  const all=[...local,...server].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  $('histResult').innerHTML=all.length?all.map(h=>`
-    <div class="hist"><div class="h"><span>${thaiDate((h.date||'').slice(0,10))} · ${esc(h.round||'')}</span>
-      <span>${h.local?'📱 ในเครื่อง':'☁️ Sheets'}</span></div>
-      <div><b>สถานะ:</b> ${esc(h.status||'-')}</div>
-      <div style="font-size:calc(14px * var(--fs));color:#334155"><b>พบ:</b> ${esc(h.found||'-')}</div>
-      ${h.repaired?`<div style="font-size:calc(14px * var(--fs));color:#15803d"><b>ซ่อมเสร็จ:</b> ${esc(h.repaired)}</div>`:''}
-      ${h.pending?`<div style="font-size:calc(14px * var(--fs));color:#b45309"><b>ค้าง:</b> ${esc(h.pending)}</div>`:''}
-      ${h.note?`<div style="font-size:calc(13px * var(--fs));color:var(--muted)">หมายเหตุ: ${esc(h.note)}</div>`:''}
-      <div style="font-size:calc(12px * var(--fs));color:var(--muted);margin-top:4px">ผู้บันทึก: ${esc(h.recorder||'-')}</div>
-    </div>`).join(''):'<div class="empty">ไม่พบประวัติของเครื่องนี้</div>';
+  renderHistory([...local,...server], f);
 }
+function renderHistory(all, f){
+  if(!all.length){
+    $('histResult').innerHTML=`<div class="card"><div class="empty">ไม่พบประวัติใน${esc(f.label)}</div></div>`;
+    return;
+  }
+  all.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const machines=new Set(all.map(h=>h.machineId));
+  const points=new Set(all.map(h=>h.pointCode).filter(Boolean));
+  const pending=all.filter(h=>String(h.pending||'').trim()).length;
+
+  // group by machine, newest activity first
+  const groups={};
+  all.forEach(h=>{(groups[h.machineId]||(groups[h.machineId]=[])).push(h)});
+  const ordered=Object.keys(groups).sort((a,b)=>
+    String(groups[b][0].date).localeCompare(String(groups[a][0].date))||a.localeCompare(b));
+
+  const head=`<div class="card"><h2>ผลการค้นหา</h2>
+    <div class="sub">${esc(f.label)}</div>
+    <div class="stat-row">
+      <div class="stat"><div class="v">${all.length}</div><div class="l">รายการซ่อม</div></div>
+      <div class="stat"><div class="v">${machines.size}</div><div class="l">เครื่อง</div></div>
+      <div class="stat"><div class="v">${points.size||1}</div><div class="l">จุด</div></div>
+    </div>
+    ${pending?`<div class="banner warn" style="margin:12px 0 0">มี ${pending} รายการที่ยังมีอาการค้าง</div>`:''}
+  </div>`;
+
+  const body=ordered.map(mid=>{
+    const rows=groups[mid], last=rows[0];
+    const st=statusClass(last.status||'');
+    return `<details class="mdetail">
+      <summary>${esc(mid)} <span class="badge cnt">${rows.length} ครั้ง</span>
+        <span class="st ${st.cls}">${esc(last.status||'-')}</span></summary>
+      <div class="body">
+        <div class="mini-label">${esc(last.pointCode||'')}${last.zoneName?' · '+esc(last.zoneName):''}</div>
+        ${rows.map(h=>`
+          <div class="hist"><div class="h">
+            <span>${thaiDate(String(h.date||'').slice(0,10))}${h.round?' · '+esc(h.round):''}</span>
+            <span>${h.local?'📱 รอ sync':'☁️ Sheets'}</span></div>
+            <div><b>สถานะ:</b> ${esc(h.status||'-')}</div>
+            <div style="font-size:calc(14px * var(--fs));color:#334155"><b>พบ:</b> ${esc(oneLine(h.found))||'-'}</div>
+            ${h.repaired?`<div style="font-size:calc(14px * var(--fs));color:#15803d"><b>ซ่อมเสร็จ:</b> ${esc(oneLine(h.repaired))}</div>`:''}
+            ${h.pending?`<div style="font-size:calc(14px * var(--fs));color:#b45309"><b>ค้าง:</b> ${esc(oneLine(h.pending))}</div>`:''}
+            ${h.note?`<div style="font-size:calc(13px * var(--fs));color:var(--muted)">หมายเหตุ: ${esc(h.note)}</div>`:''}
+            <div style="font-size:calc(12px * var(--fs));color:var(--muted);margin-top:4px">ผู้บันทึก: ${esc(h.recorder||'-')}</div>
+          </div>`).join('')}
+      </div></details>`;
+  }).join('');
+  $('histResult').innerHTML=head+body;
+}
+function oneLine(v){return String(v||'').replace(/\s*\n\s*/g,' , ').trim()}
 
 /* ---- settings / master refresh ---- */
 function saveConfig(){
