@@ -262,11 +262,12 @@
   <!-- ============ DETAIL ============ -->
   <section class="screen" id="s-detail">
     <div class="card" id="bulkBoard"></div>
+    <div class="card" id="groupRepair"></div>
     <div class="sec-head">
-      <b>รายละเอียดต่อเครื่อง</b>
-      <span class="link" onclick="repairAllMachines()">ซ่อมครบทุกเครื่อง ✓</span>
+      <b>ปรับรายเครื่อง (ถ้าบางเครื่องต่างกัน)</b>
+      <span class="link" onclick="togglePerMachine()" id="perMachineToggle">แสดง</span>
     </div>
-    <div id="detailList"></div>
+    <div id="detailList" style="display:none"></div>
   </section>
 
   <!-- ============ HISTORY ============ -->
@@ -527,13 +528,16 @@ function openDetail(){
 function renderDetail(){
   const ids=Object.keys(selected);
   $('saveCount').textContent=ids.length;
-  $('bulkBoard').innerHTML=bulkBoardHtml(ids);
+  $('bulkBoard').innerHTML=foundBoardHtml(ids);
+  $('groupRepair').innerHTML=repairBoardHtml(ids);
   $('detailList').innerHTML=ids.map(machineCardHtml).join('');
 }
 
 function mLabel(id){const m=selected[id];return m.type+m.num}
 
-function bulkBoardHtml(ids){
+/* Card 1 — the selected machines are a group (all active by default); tap a symptom
+   once to apply it to every highlighted machine. Tap a machine to narrow the group. */
+function foundBoardHtml(ids){
   const chips=ids.map(id=>{
     const cnt=details[id].found.size;
     return `<button class="mchip ${activeSet.has(id)?'on':''}" onclick="toggleActive('${id}')">${esc(mLabel(id))}${cnt?`<i>${cnt}</i>`:''}</button>`;
@@ -547,17 +551,71 @@ function bulkBoardHtml(ids){
       <div class="assigned">${nums.length?nums.map(n=>`<span class="numbadge">${esc(n)}</span>`).join(''):'<span class="none">ยังไม่มี</span>'}</div>
     </div>`;
   }).join('');
-  return `<h2>ใส่อาการที่พบ (เลือกทีละอาการ ใส่ให้หลายเครื่องพร้อมกัน)</h2>
-    <div class="sub">แตะเลือกเครื่องที่ต้องการ (ไฮไลต์) แล้วแตะอาการด้านล่าง — อาการจะถูกใส่ให้ทุกเครื่องที่เลือกอัตโนมัติ</div>
-    <div class="toolrow"><div class="mini-label">เครื่องที่กำลังกำหนด (${activeSet.size}/${ids.length})</div>
-      <div class="acts"><span class="link" onclick="setActiveAll(true)">เลือกทั้งหมด</span><span class="link" onclick="setActiveAll(false)">ล้าง</span></div></div>
+  const all=activeSet.size===ids.length;
+  return `<h2>เครื่องที่เลือก (${activeSet.size}/${ids.length})</h2>
+    <div class="sub">แตะ “อาการที่พบ” ด้านล่าง = ใส่ให้ทุกเครื่องที่ไฮไลต์พร้อมกัน · แตะชื่อเครื่องเพื่อเลือกเฉพาะบางตัว
+      <span class="link" onclick="setActiveAll(${all?'false':'true'})" style="margin-left:6px">${all?'เลือกเฉพาะบางตัว':'เลือกทั้งหมด'}</span></div>
     <div class="chips">${chips}</div>
-    <div class="mini-label">อาการที่พบ — ตัวเลขคือเครื่องที่ถูกใส่อาการนั้นแล้ว</div>
+    <div class="mini-label">อาการที่พบ — ตัวเลขคือเครื่องที่ใส่อาการนั้นแล้ว</div>
     <div class="symlist">${rows}</div>`;
 }
 
+/* Card 2 — repair result for the whole active group in one place. */
+function repairBoardHtml(ids){
+  const union=activeFoundUnion();
+  const act=[...activeSet];
+  const totalFound=act.reduce((n,id)=>n+details[id].found.size,0);
+  const totalPend=act.reduce((n,id)=>n+[...details[id].found].filter(c=>!details[id].repaired.has(c)).length,0);
+  const gs=groupStatusValue();
+  const chips=union.length?union.map(c=>{
+    const st=repairedState(c);
+    return `<button class="chip rep ${st==='on'?'on':''}" style="${st==='partial'?'border-color:var(--warn);color:#b45309':''}" onclick="bulkRepaired('${c}')">${esc(symName(c))}${st==='partial'?' •บางตัว':''}</button>`;
+  }).join(''):'<span style="color:var(--muted);font-size:13px">เลือกอาการที่พบก่อน</span>';
+  return `<h2>ผลการซ่อม (ใส่ให้ทุกเครื่องที่เลือก)</h2>
+    <div class="sub">ซ่อมได้หมดกดปุ่มเดียว หรือแตะเฉพาะอาการที่ซ่อมเสร็จ</div>
+    <button class="btn btn-outline" onclick="repairAllMachines()" ${union.length?'':'disabled style="opacity:.5"'}>✓ ซ่อมครบทุกเครื่องที่เลือก (สถานะ = เสร็จสิ้น)</button>
+    <div class="mini-label">อาการที่ซ่อมเสร็จ</div>
+    <div class="chips">${chips}</div>
+    <div class="mini-label">สถานะ (ตั้งให้ทุกเครื่องที่เลือก)</div>
+    <select onchange="bulkStatus(this.value)">
+      <option value="">${gs?'— เปลี่ยนสถานะ —':'— คละกัน / อัตโนมัติ —'}</option>
+      ${MASTER.statuses.map(s=>`<option value="${esc(s)}" ${gs===s?'selected':''}>${esc(s)}</option>`).join('')}
+    </select>
+    <div class="banner ${totalPend?'warn':'ok'}" style="margin:12px 0 0">รวมอาการที่พบ ${totalFound} · ค้าง ${totalPend}${totalPend?'':' · ซ่อมครบ ✓'}</div>`;
+}
+
+function togglePerMachine(){
+  const el=$('detailList');const show=el.style.display==='none';
+  el.style.display=show?'block':'none';
+  $('perMachineToggle').textContent=show?'ซ่อน':'แสดง';
+}
 function toggleActive(id){ activeSet.has(id)?activeSet.delete(id):activeSet.add(id); renderDetail(); }
 function setActiveAll(on){ activeSet=on?new Set(Object.keys(selected)):new Set(); renderDetail(); }
+
+/* group repair helpers */
+function activeFoundUnion(){ const s=new Set(); [...activeSet].forEach(id=>details[id].found.forEach(c=>s.add(c))); return [...s]; }
+function repairedState(code){
+  const act=[...activeSet].filter(id=>details[id].found.has(code));
+  if(!act.length)return 'off';
+  const rep=act.filter(id=>details[id].repaired.has(code)).length;
+  return rep===0?'off':rep===act.length?'on':'partial';
+}
+function bulkRepaired(code){
+  const act=[...activeSet].filter(id=>details[id].found.has(code));
+  if(!act.length)return;
+  const allRep=act.every(id=>details[id].repaired.has(code));
+  act.forEach(id=> allRep?details[id].repaired.delete(code):details[id].repaired.add(code));
+  renderDetail();
+}
+function groupStatusValue(){
+  const vals=[...activeSet].map(id=>computeStatus(details[id]));
+  return vals.length&&vals.every(v=>v===vals[0])?vals[0]:'';
+}
+function bulkStatus(v){
+  if(!v)return;
+  [...activeSet].forEach(id=>{details[id].status=v;details[id].statusAuto=false});
+  renderDetail();
+}
 
 /* state of a symptom relative to the active machine set */
 function symptomState(code){
@@ -610,8 +668,10 @@ function machineCardHtml(id){
 }
 
 function repairAllMachines(){
-  Object.keys(selected).forEach(id=>{ details[id].repaired=new Set(details[id].found); });
-  renderDetail(); toast('ตั้งเป็นซ่อมครบทุกเครื่องแล้ว','ok');
+  const act=[...activeSet];
+  if(!act.length){toast('เลือกเครื่องก่อน','err');return}
+  act.forEach(id=>{ details[id].repaired=new Set(details[id].found); details[id].statusAuto=true; details[id].status=''; });
+  renderDetail(); toast('ตั้งซ่อมครบให้เครื่องที่เลือกแล้ว','ok');
 }
 
 function pendingHtml(d){
