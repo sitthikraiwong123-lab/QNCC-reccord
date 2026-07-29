@@ -352,6 +352,26 @@ let session = loadJSON(LS.SESSION, null);
 let outbox  = loadJSON(LS.OUTBOX, []);
 let backendUrl = localStorage.getItem(LS.URL) || '';
 let navStack = [];
+
+/* ---- transport ----
+   RUN = true when the page is served BY Apps Script (HtmlService): we talk to the
+   backend via google.script.run — same-origin, no CORS, no URL config, and it works
+   with Workspace-restricted deployments ("Anyone within <org>"). When the page is
+   opened standalone (GitHub Pages / file), fall back to fetch against a pasted URL. */
+const RUN = (typeof google !== 'undefined' && google.script && google.script.run);
+function gsRun(fn, arg){
+  return new Promise((res, rej)=>{
+    const r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
+    arg === undefined ? r[fn]() : r[fn](arg);
+  });
+}
+async function fetchJSON(url){const r=await fetch(url);const d=await r.json();if(!d.ok)throw new Error(d.error||'error');return d}
+async function postJSON(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});const d=await r.json();if(!d.ok)throw new Error(d.error||'error');return d}
+const api = {
+  getMaster:      ()=> RUN ? gsRun('getMasterData')      : fetchJSON(backendUrl+'?action=master').then(d=>d.data),
+  save:    (records)=> RUN ? gsRun('saveRecords',{records}) : postJSON(backendUrl,{records}).then(d=>d.result),
+  history:      (id)=> RUN ? gsRun('getHistory',id)      : fetchJSON(backendUrl+'?action=history&machineId='+encodeURIComponent(id)).then(d=>d.history),
+};
 let curPoint = null;
 let selected = {};     // machineId -> machine obj (picker)
 let details  = {};     // machineId -> {found:Set, repaired:Set, status, statusAuto, detail, note}
@@ -675,21 +695,18 @@ function rememberRecorder(name){
 async function syncNow(silent){
   const pend=outbox.filter(o=>o.status!=='synced');
   if(!pend.length){if(!silent)toast('ไม่มีรายการรอส่ง');return}
-  if(!backendUrl){if(!silent)toast('ยังไม่ได้ตั้งค่า Web App URL','err');updateSyncBanner();return}
+  if(!RUN && !backendUrl){if(!silent)toast('ยังไม่ได้ตั้งค่า Web App URL','err');updateSyncBanner();return}
   if(!online()){if(!silent)toast('ออฟไลน์ — จะส่งอัตโนมัติเมื่อมีสัญญาณ','err');updateSyncBanner();return}
   if(!silent)toast('กำลังส่ง...');
   try{
-    const res=await fetch(backendUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({records:pend.map(o=>o.rec)})});
-    const data=await res.json();
-    if(!data.ok)throw new Error(data.error||'server error');
+    const result=await api.save(pend.map(o=>o.rec));
     pend.forEach(o=>o.status='synced');
     save(LS.OUTBOX,outbox);
-    toast(`ส่งขึ้น Sheets แล้ว ${data.result.written} รายการ`+(data.result.skipped?` (ข้ามซ้ำ ${data.result.skipped})`:''),'ok');
+    toast(`ส่งขึ้น Sheets แล้ว ${result.written} รายการ`+(result.skipped?` (ข้ามซ้ำ ${result.skipped})`:''),'ok');
   }catch(err){
     pend.forEach(o=>{if(o.status!=='synced')o.status='pending'});
     save(LS.OUTBOX,outbox);
-    if(!silent)toast('ส่งไม่สำเร็จ: '+err.message,'err');
+    if(!silent)toast('ส่งไม่สำเร็จ: '+(err.message||err),'err');
   }
   renderProgress();updateSyncBanner();renderOutbox();
 }
@@ -734,13 +751,9 @@ async function loadHistory(){
     status:o.rec.status,recorder:o.rec.recorder,note:o.rec.note,local:true
   }));
   let server=[];
-  if(backendUrl&&online()){
+  if((RUN||backendUrl)&&online()){
     $('histResult').innerHTML='<div class="empty">กำลังโหลด...</div>';
-    try{
-      const res=await fetch(backendUrl+'?action=history&machineId='+encodeURIComponent(id));
-      const data=await res.json();
-      if(data.ok)server=data.history||[];
-    }catch(e){/* offline fallback */}
+    try{ server=await api.history(id)||[]; }catch(e){/* offline fallback */}
   }
   const all=[...local,...server].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   $('histResult').innerHTML=all.length?all.map(h=>`
@@ -763,21 +776,19 @@ function saveConfig(){
   if(backendUrl)refreshMaster();else $('cfgStatus').innerHTML='<div class="banner warn">ลบ URL แล้ว — ใช้ข้อมูลตั้งต้นออฟไลน์</div>';
 }
 async function refreshMaster(){
-  if(!backendUrl){$('cfgStatus').innerHTML='<div class="banner warn">ยังไม่ได้ใส่ URL</div>';return}
+  if(!RUN && !backendUrl){$('cfgStatus').innerHTML='<div class="banner warn">ยังไม่ได้ใส่ URL</div>';return}
   $('cfgStatus').innerHTML='<div class="banner info">กำลังเชื่อมต่อ...</div>';
   try{
-    const res=await fetch(backendUrl+'?action=master');
-    const data=await res.json();
-    if(!data.ok)throw new Error(data.error||'error');
-    MASTER=data.data;save(LS.MASTER,MASTER);
+    MASTER=await api.getMaster();
+    save(LS.MASTER,MASTER);
     afterMasterLoad();
     $('cfgStatus').innerHTML=`<div class="banner ok">เชื่อมต่อสำเร็จ · โหลด ${MASTER.points.length} จุด / ${MASTER.meta.machineCount} เครื่อง</div>`;
     toast('อัปเดตทะเบียนล่าสุดแล้ว','ok');
   }catch(err){
-    $('cfgStatus').innerHTML=`<div class="banner warn">เชื่อมต่อไม่ได้: ${esc(err.message)} — ใช้ข้อมูลแคชต่อไป</div>`;
+    $('cfgStatus').innerHTML=`<div class="banner warn">เชื่อมต่อไม่ได้: ${esc(err.message||err)} — ใช้ข้อมูลแคชต่อไป</div>`;
   }
 }
-function updateConnLabel(){$('connLabel').textContent=backendUrl?'เชื่อมต่อแล้ว':'ยังไม่เชื่อมต่อ (ออฟไลน์)'}
+function updateConnLabel(){$('connLabel').textContent=RUN?'เชื่อมต่อผ่าน Apps Script':(backendUrl?'เชื่อมต่อแล้ว':'ยังไม่เชื่อมต่อ (ออฟไลน์)')}
 function updateMasterMeta(){
   $('masterMeta').textContent=`${MASTER.points.length} จุด · ${MASTER.meta.machineCount||countMachines()} เครื่อง · ${MASTER.symptoms.length} อาการ · ${MASTER.zones.length} โซน`;
 }
@@ -799,8 +810,12 @@ function boot(){
   fillRecorders();
   $('cfgUrl').value=backendUrl;
   updateConnLabel();updateMasterMeta();updateSyncBanner();fillMachineIds();
+  if(RUN){
+    $('cfgUrl').closest('.field').style.display='none';   // URL not needed when served by Apps Script
+    $('cfgStatus').innerHTML='<div class="banner ok">ใช้งานผ่าน Apps Script (google.script.run) — ไม่ต้องตั้งค่า URL</div>';
+  }
   // auto pull latest registry if connected
-  if(backendUrl&&online())refreshMaster();
+  if((RUN||backendUrl)&&online())refreshMaster();
 }
 window.addEventListener('online',()=>{$('netdot').classList.add('online');updateSyncBanner();syncNow(true)});
 window.addEventListener('offline',()=>{$('netdot').classList.remove('online');updateSyncBanner()});

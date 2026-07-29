@@ -13,7 +13,10 @@
    • sync เมื่อมีสัญญาณ                                          (เขียนแถวใหม่ครบทุกฟิลด์)
 ```
 - **Frontend:** `index.html` ไฟล์เดียว (HTML+CSS+JS inline) — mobile-first, offline-first
-- **Backend:** `Code.gs` (Google Apps Script) ผูกกับไฟล์ Google Sheets เดิม
+  คุยกับ backend ผ่าน `google.script.run` เมื่อถูกเสิร์ฟจาก Apps Script (same-origin ไม่มี CORS)
+  หรือ fallback เป็น `fetch` เมื่อโฮสต์แยก
+- **Backend:** `Code.gs` (Google Apps Script) ผูกกับไฟล์ Google Sheets เดิม — `doGet` เสิร์ฟตัวแอพ
+  (HtmlService) และเปิด endpoint JSON, ส่วน `getMasterData/saveRecords/getHistory` เรียกตรงผ่าน `google.script.run`
 - **Manifest:** `appsscript.json` (timezone Asia/Bangkok, V8, deploy เป็น Web App)
 - **`master-data.json`:** ชุดข้อมูลตั้งต้นที่สกัดจากไฟล์ Excel — ฝังอยู่ใน `index.html`
   แล้ว ทำให้แอพใช้งานได้ทันทีแบบออฟไลน์ ก่อนเชื่อมต่อ backend
@@ -30,22 +33,36 @@
 
 ## วิธีติดตั้ง (Deploy)
 
-### 1) ฝั่ง Google Sheets + Apps Script
-1. เปิดไฟล์ Google Sheets เดิม (ที่มีชีต `ทะเบียนเครื่อง`, `บันทึกการซ่อม`, `ข้อมูลหลัก`, `รายงาน`, `สรุปข้อมูล`)
-2. เมนู **ส่วนขยาย (Extensions) → Apps Script**
-3. วางเนื้อหา `Code.gs` ลงในไฟล์ `Code.gs` ของโปรเจกต์ (ถ้ามีโค้ดเดิมให้แทนที่)
-4. (ถ้าต้องการ) ตั้งค่า manifest ตาม `appsscript.json`
-5. กด **Deploy → New deployment → เลือกชนิด Web app**
+> **แนะนำวิธี A** สำหรับองค์กรที่ใช้ Google Workspace แบบปิด (deploy web app สาธารณะไม่ได้ —
+> "Who has access" มีแค่ *Only myself* / *Anyone within \<org\>*) เพราะ Apps Script จะ
+> **เสิร์ฟตัวแอพเอง** ทำให้หน้าเว็บกับ backend อยู่โดเมนเดียวกัน (same-origin) เรียกผ่าน
+> `google.script.run` — **ไม่มีปัญหา CORS / ไม่ต้องตั้งค่า URL** ผู้ใช้แค่ล็อกอินบัญชีองค์กรครั้งเดียว
+
+### วิธี A (แนะนำ) — ให้ Apps Script เสิร์ฟแอพเอง
+1. เปิดไฟล์ Google Sheets เดิม → **ส่วนขยาย (Extensions) → Apps Script**
+2. วางเนื้อหา `Code.gs` ลงในไฟล์ `Code.gs` (แทนที่ของเดิม)
+3. **สร้างไฟล์ HTML ใหม่ชื่อ `index`** (ปุ่ม **+ → HTML**) แล้ววางเนื้อหาทั้งหมดของ `index.html`
+   ลงไป (Apps Script จะเรียกไฟล์นี้ว่า `index.html` — ต้องชื่อ `index` เท่านั้น)
+4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
-   - Who has access: **Anyone** (หรือ *Anyone with Google account* ตามนโยบายองค์กร)
-6. คัดลอก **Web app URL** (ลงท้าย `/exec`)
+   - Who has access: **Anyone within \<องค์กรของคุณ\>** (หรือ *Anyone* ถ้าองค์กรอนุญาต)
+   - ครั้งแรกจะให้ **Authorize access** → เลือกบัญชี → *Advanced → Go to project → Allow*
+5. เปิด **Web app URL (ลงท้าย `/exec`)** — URL นี้**คือตัวแอพ** ให้ช่างบุ๊กมาร์กไว้ใช้หน้างานได้เลย
+   (ล็อกอินบัญชีองค์กรอัตโนมัติ ไม่ต้องตั้งค่าอะไรเพิ่ม)
 
-> Apps Script จะทำงานบนไฟล์ที่มันผูกอยู่ (`getActiveSpreadsheet()`) — ไม่ต้องใส่ Spreadsheet ID
+> เมื่อเปลี่ยนโค้ด/HTML ต้อง **Deploy → Manage deployments → แก้ไข → New version → Deploy** ทุกครั้ง
+> URL `/exec` ยังเหมือนเดิม
 
-### 2) ฝั่งแอพมือถือ
-- เปิด `index.html` (โฮสต์บน GitHub Pages / Google Sites / ไฟล์ในเครื่อง ก็ได้)
-- ไปที่ **⚙️ ตั้งค่าการเชื่อมต่อ** → วาง Web app URL → **บันทึก & ทดสอบ**
-- แอพจะดึงทะเบียนเครื่องล่าสุดมาแคชไว้ และพร้อมส่งข้อมูลขึ้นชีต
+### วิธี B (สำรอง) — โฮสต์ `index.html` แยก แล้วเรียกผ่าน fetch
+ใช้ได้เฉพาะองค์กรที่ deploy web app แบบ **Anyone (สาธารณะ)** ได้เท่านั้น:
+1. Deploy `Code.gs` เป็น Web app, Who has access = **Anyone**, คัดลอก URL `/exec`
+2. โฮสต์ `index.html` (GitHub Pages / Google Sites) → เปิดแอพ → **⚙️ ตั้งค่า** → วาง URL → บันทึก
+   - ถ้าองค์กรบังคับล็อกอิน (URL เป็น `script.google.com/a/macros/<org>/...`) วิธีนี้จะติด CORS
+     → ใช้ **วิธี A** แทน
+
+> ตัว `index.html` ตรวจเองว่าถูกเสิร์ฟจาก Apps Script หรือไม่ (`google.script.run`)
+> ถ้าใช่ → เรียก backend ตรง ๆ; ถ้าไม่ → fallback ไป fetch ตาม URL ที่ตั้งไว้
+> ทั้งสองวิธี Apps Script ทำงานบนไฟล์ที่ผูกอยู่ (`getActiveSpreadsheet()`) — ไม่ต้องใส่ Spreadsheet ID
 
 ---
 

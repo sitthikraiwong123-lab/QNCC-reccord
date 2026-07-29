@@ -36,11 +36,18 @@ var ENSURE_COLS = ['ผู้บันทึก', 'อาการที่ซ�
 
 /* ------------------------------------------------------------------ router */
 function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) || 'master';
+  var action = (e && e.parameter && e.parameter.action) || '';
   try {
     if (action === 'ping')    return json({ ok: true, ts: new Date().toISOString() });
     if (action === 'history') return json({ ok: true, history: getHistory(e.parameter.machineId) });
-    return json({ ok: true, data: getMasterData() });
+    if (action === 'master')  return json({ ok: true, data: getMasterData() });
+    // Default: serve the app itself. Same-origin as the backend → no CORS, and the
+    // client talks to the server via google.script.run (see index.html). This is the
+    // only reliable pattern when the Workspace forbids anonymous ("Anyone") web apps.
+    return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle('QSNCC · บันทึกการซ่อมเครื่องฆ่าเชื้อ')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
   }
