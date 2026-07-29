@@ -28,8 +28,11 @@ var SHEETS = {
 // Statuses offered in the app (master-driven; edit here or expose from a sheet later).
 var STATUS_LIST = ['เสร็จสิ้น', 'เสร็จบางส่วน', 'รออะไหล่', 'ส่งซ่อมภายนอก', 'ยกเลิก'];
 
-// Extra columns appended to the repair log (once) to capture app-computed detail.
-var EXTRA_COLS = ['อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', 'อาการที่ยังค้าง (รหัส+ชื่อ)'];
+// Columns the app guarantees exist in the repair log (created once if missing).
+// "ผู้บันทึก" already exists in the source sheet — kept here as a safety net so the
+// recorder is always trackable even on a sheet variant that lacks it. The two symptom
+// columns capture app-computed detail the original schema had no place for.
+var ENSURE_COLS = ['ผู้บันทึก', 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', 'อาการที่ยังค้าง (รหัส+ชื่อ)'];
 
 /* ------------------------------------------------------------------ router */
 function doGet(e) {
@@ -237,7 +240,7 @@ function symText(list) {
 
 function ensureExtraColumns(sh) {
   var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
-  EXTRA_COLS.forEach(function (name) {
+  ENSURE_COLS.forEach(function (name) {
     if (header.indexOf(name) === -1) {
       var col = sh.getLastColumn() + 1;
       sh.getRange(1, col).setValue(name);

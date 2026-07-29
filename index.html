@@ -103,6 +103,32 @@
   .chip.rep.on{border-color:var(--ok);background:var(--ok-soft);color:#15803d}
   .chip:disabled{opacity:.4;cursor:not-allowed}
 
+  /* bulk assignment board */
+  .mchip{border:1.5px solid var(--line);background:#fff;border-radius:11px;padding:10px 14px;font-weight:800;
+    font-size:15px;cursor:pointer;font-family:inherit;color:#334155;position:relative}
+  .mchip.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+  .mchip i{font-style:normal;font-size:10px;background:var(--brand);color:#fff;border-radius:999px;
+    padding:1px 6px;margin-left:6px;vertical-align:middle}
+  .toolrow{display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px}
+  .toolrow .mini-label{margin:0}
+  .toolrow .acts .link{margin-left:14px;font-weight:700}
+  .symlist{display:flex;flex-direction:column;gap:9px}
+  .symrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .symbtn{flex:1 1 165px;max-width:250px;display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);
+    background:#fff;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:700;cursor:pointer;
+    font-family:inherit;color:#334155;text-align:left}
+  .symbtn .bx{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:16px;
+    background:#f1f5f9;color:#94a3b8;flex:0 0 auto}
+  .symbtn.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-dark)}
+  .symbtn.on .bx{background:var(--brand);color:#fff}
+  .symbtn.partial{border-color:var(--warn);background:var(--warn-soft);color:#92400e}
+  .symbtn.partial .bx{background:var(--warn);color:#fff}
+  .assigned{display:flex;flex-wrap:wrap;gap:5px;flex:1 1 120px;align-items:center}
+  .numbadge{background:var(--brand);color:#fff;border-radius:8px;font-size:12px;font-weight:800;padding:2px 8px}
+  .assigned .none{color:#cbd5e1;font-size:13px}
+  .sec-head{display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px}
+  .sec-head b{font-size:14px;color:#334155}
+
   .mdetail{border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;background:#fff}
   .mdetail>summary{list-style:none;cursor:pointer;padding:14px;display:flex;align-items:center;gap:10px;font-weight:700}
   .mdetail>summary::-webkit-details-marker{display:none}
@@ -235,7 +261,11 @@
 
   <!-- ============ DETAIL ============ -->
   <section class="screen" id="s-detail">
-    <div class="banner info" id="detailHint">กรอกอาการที่พบ / ที่ซ่อมเสร็จของแต่ละเครื่อง</div>
+    <div class="card" id="bulkBoard"></div>
+    <div class="sec-head">
+      <b>รายละเอียดต่อเครื่อง</b>
+      <span class="link" onclick="repairAllMachines()">ซ่อมครบทุกเครื่อง ✓</span>
+    </div>
     <div id="detailList"></div>
   </section>
 
@@ -456,61 +486,119 @@ function updateSelBar(){
   $('toDetailBtn').style.opacity=n?1:.6;
 }
 
-/* ---- detail ---- */
+/* ---- detail ----
+   Two-part screen:
+   (A) bulk board — pick machines (active set), tap a symptom → applied to every
+       active machine at once ("เลือกเครื่อง 1 2 3 → หัววงจรเสีย → ใส่ให้ 1 2 3").
+       A symptom already on every active machine shows ✓; tapping another symptom
+       adds it. (B) per-machine cards — repaired symptoms, status, note.        */
+let activeSet = new Set();
+
 function openDetail(){
   const ids=Object.keys(selected);
   if(!ids.length)return;
   ids.forEach(id=>{ if(!details[id]) details[id]={found:new Set(),repaired:new Set(),status:'',statusAuto:true,detail:'',note:''} });
-  // drop details for deselected
   Object.keys(details).forEach(id=>{if(!selected[id])delete details[id]});
+  activeSet=new Set(ids);   // default: apply to all selected machines
   show('s-detail');
   renderDetail();
 }
+
 function renderDetail(){
   const ids=Object.keys(selected);
   $('saveCount').textContent=ids.length;
-  $('detailList').innerHTML=ids.map(id=>{
-    const m=selected[id],d=details[id];
-    const st=statusClass(computeStatus(d));
-    return `<details class="mdetail" open>
-      <summary>${esc(id)} <span class="st ${st.cls}">${esc(st.label)}</span></summary>
-      <div class="body">
-        <div class="mini-label">อาการที่พบ</div>
-        <div class="chips">${MASTER.symptoms.map(s=>`
-          <button class="chip ${d.found.has(s.code)?'on':''}" onclick="toggleFound('${id}','${s.code}')">${esc(s.name)}</button>`).join('')}</div>
-
-        <div class="mini-label" style="display:flex;align-items:center;justify-content:space-between">
-          <span>อาการที่ซ่อมเสร็จ</span>
-          ${d.found.size?`<span class="link" onclick="repairAll('${id}')">ซ่อมครบ ✓</span>`:''}
-        </div>
-        <div class="chips">${MASTER.symptoms.map(s=>`
-          <button class="chip rep ${d.repaired.has(s.code)?'on':''}" ${d.found.has(s.code)?'':'disabled'} onclick="toggleRepaired('${id}','${s.code}')">${esc(s.name)}</button>`).join('')||'<span style="color:var(--muted);font-size:13px">เลือกอาการที่พบก่อน</span>'}</div>
-
-        ${pendingHtml(d)}
-
-        <div class="mini-label">สถานะ</div>
-        <select onchange="setStatus('${id}',this.value)">
-          ${MASTER.statuses.map(s=>`<option value="${esc(s)}" ${computeStatus(d)===s?'selected':''}>${esc(s)}</option>`).join('')}
-        </select>
-
-        <div class="mini-label">รายละเอียด / การซ่อม (ถ้ามี)</div>
-        <textarea placeholder="เช่น เปลี่ยนหัววงจร, รออะไหล่ฝาหน้า" oninput="setField('${id}','detail',this.value)">${esc(d.detail)}</textarea>
-        <div class="mini-label">หมายเหตุ</div>
-        <input type="text" value="${esc(d.note)}" placeholder="หมายเหตุเพิ่มเติม" oninput="setField('${id}','note',this.value)" />
-      </div>
-    </details>`;
-  }).join('');
+  $('bulkBoard').innerHTML=bulkBoardHtml(ids);
+  $('detailList').innerHTML=ids.map(machineCardHtml).join('');
 }
+
+function mLabel(id){const m=selected[id];return m.type+m.num}
+
+function bulkBoardHtml(ids){
+  const chips=ids.map(id=>{
+    const cnt=details[id].found.size;
+    return `<button class="mchip ${activeSet.has(id)?'on':''}" onclick="toggleActive('${id}')">${esc(mLabel(id))}${cnt?`<i>${cnt}</i>`:''}</button>`;
+  }).join('');
+  const rows=MASTER.symptoms.map(s=>{
+    const st=symptomState(s.code);
+    const nums=assignedNums(s.code);
+    const bx=st==='on'?'✓':st==='partial'?'–':'+';
+    return `<div class="symrow">
+      <button class="symbtn ${st}" onclick="bulkSymptom('${s.code}')"><span class="bx">${bx}</span>${esc(s.name)}</button>
+      <div class="assigned">${nums.length?nums.map(n=>`<span class="numbadge">${esc(n)}</span>`).join(''):'<span class="none">ยังไม่มี</span>'}</div>
+    </div>`;
+  }).join('');
+  return `<h2>ใส่อาการที่พบ (เลือกทีละอาการ ใส่ให้หลายเครื่องพร้อมกัน)</h2>
+    <div class="sub">แตะเลือกเครื่องที่ต้องการ (ไฮไลต์) แล้วแตะอาการด้านล่าง — อาการจะถูกใส่ให้ทุกเครื่องที่เลือกอัตโนมัติ</div>
+    <div class="toolrow"><div class="mini-label">เครื่องที่กำลังกำหนด (${activeSet.size}/${ids.length})</div>
+      <div class="acts"><span class="link" onclick="setActiveAll(true)">เลือกทั้งหมด</span><span class="link" onclick="setActiveAll(false)">ล้าง</span></div></div>
+    <div class="chips">${chips}</div>
+    <div class="mini-label">อาการที่พบ — ตัวเลขคือเครื่องที่ถูกใส่อาการนั้นแล้ว</div>
+    <div class="symlist">${rows}</div>`;
+}
+
+function toggleActive(id){ activeSet.has(id)?activeSet.delete(id):activeSet.add(id); renderDetail(); }
+function setActiveAll(on){ activeSet=on?new Set(Object.keys(selected)):new Set(); renderDetail(); }
+
+/* state of a symptom relative to the active machine set */
+function symptomState(code){
+  const act=[...activeSet];
+  if(!act.length)return 'off';
+  const have=act.filter(id=>details[id].found.has(code)).length;
+  return have===0?'off':have===act.length?'on':'partial';
+}
+/* machine labels (across all selected) that currently have this symptom */
+function assignedNums(code){
+  return Object.keys(selected).filter(id=>details[id].found.has(code)).map(mLabel);
+}
+/* apply / remove a symptom across the whole active set */
+function bulkSymptom(code){
+  const act=[...activeSet];
+  if(!act.length){toast('แตะเลือกเครื่องก่อน','err');return}
+  const allHave=act.every(id=>details[id].found.has(code));
+  act.forEach(id=>{
+    if(allHave){ details[id].found.delete(code); details[id].repaired.delete(code); }
+    else details[id].found.add(code);
+  });
+  renderDetail();
+}
+
+function machineCardHtml(id){
+  const d=details[id];
+  const foundArr=[...d.found];
+  const has=foundArr.length;
+  const st=has?statusClass(computeStatus(d)):{cls:'none',label:'ยังไม่เลือกอาการ'};
+  return `<details class="mdetail">
+    <summary>${esc(mLabel(id))} · ${esc(id)} <span class="st ${st.cls}">${esc(st.label)}</span></summary>
+    <div class="body">
+      <div class="mini-label">อาการที่พบ (แก้ที่แผงด้านบน)</div>
+      <div class="chips">${has?foundArr.map(c=>`<span class="chip on" style="cursor:default">${esc(symName(c))}</span>`).join(''):'<span style="color:var(--muted);font-size:13px">ยังไม่เลือกอาการ</span>'}</div>
+      ${has?`
+      <div class="mini-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span>อาการที่ซ่อมเสร็จ</span><span class="link" onclick="repairAll('${id}')">ซ่อมครบ ✓</span>
+      </div>
+      <div class="chips">${foundArr.map(c=>`<button class="chip rep ${d.repaired.has(c)?'on':''}" onclick="toggleRepaired('${id}','${c}')">${esc(symName(c))}</button>`).join('')}</div>
+      ${pendingHtml(d)}
+      <div class="mini-label">สถานะ</div>
+      <select onchange="setStatus('${id}',this.value)">${MASTER.statuses.map(s=>`<option value="${esc(s)}" ${computeStatus(d)===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+      <div class="mini-label">รายละเอียด / การซ่อม (ถ้ามี)</div>
+      <textarea placeholder="เช่น เปลี่ยนหัววงจร, รออะไหล่ฝาหน้า" oninput="setField('${id}','detail',this.value)">${esc(d.detail)}</textarea>
+      <div class="mini-label">หมายเหตุ</div>
+      <input type="text" value="${esc(d.note)}" placeholder="หมายเหตุเพิ่มเติม" oninput="setField('${id}','note',this.value)" />
+      `:''}
+    </div>
+  </details>`;
+}
+
+function repairAllMachines(){
+  Object.keys(selected).forEach(id=>{ details[id].repaired=new Set(details[id].found); });
+  renderDetail(); toast('ตั้งเป็นซ่อมครบทุกเครื่องแล้ว','ok');
+}
+
 function pendingHtml(d){
   const pend=[...d.found].filter(c=>!d.repaired.has(c));
   if(!d.found.size)return'';
   if(!pend.length)return`<div class="banner ok" style="margin:12px 0 0">ซ่อมครบทุกอาการ ✓</div>`;
   return`<div class="banner warn" style="margin:12px 0 0">ค้าง: ${pend.map(symName).map(esc).join(', ')}</div>`;
-}
-function toggleFound(id,code){
-  const d=details[id];
-  if(d.found.has(code)){d.found.delete(code);d.repaired.delete(code)}else d.found.add(code);
-  renderDetail();
 }
 function toggleRepaired(id,code){
   const d=details[id];
