@@ -1181,6 +1181,13 @@ function copyDiagUrl(){
   if(navigator.clipboard) navigator.clipboard.writeText(lastDiag.spreadsheetUrl);
   toast('คัดลอกลิงก์แล้ว');
 }
+function headerCheckHtml(list){
+  if(!list||!list.length)return'';
+  const bad=list.filter(h=>!h.found);
+  return `<div class="mini-label">ตรวจหัวคอลัมน์ในชีต (ที่ระบบต้องใช้)</div>
+    <div class="chips">${list.map(h=>`<span class="chip ${h.found?'on':''}" style="${h.found?'':'border-color:var(--danger);color:var(--danger)'}">${h.found?'✓':'✗'} ${esc(h.name)}</span>`).join('')}</div>
+    ${bad.length?`<div class="banner warn" style="margin-top:8px">⚠️ ไม่พบคอลัมน์: ${bad.map(h=>esc(h.name)).join(', ')} — นี่คือสาเหตุที่บันทึกล้มเหลว ต้องแก้ชื่อหัวคอลัมน์ในแถวที่ 1 ของชีต "บันทึกการซ่อม" ให้ตรงกับที่ระบุ</div>`:''}`;
+}
 async function runDiag(){
   if(!RUN&&!backendUrl){$('diagResult').innerHTML='<div class="banner warn">ยังไม่ได้ตั้งค่า URL</div>';return}
   $('diagResult').innerHTML='<div class="empty">กำลังตรวจสอบ...</div>';
@@ -1199,6 +1206,7 @@ async function runDiag(){
         <div class="stat"><div class="v">${d.dataLastRow||0}</div><div class="l">แถวข้อมูลจริงล่าสุด</div></div>
         <div class="stat"><div class="v">${d.rawLastRow||0}</div><div class="l">getLastRow() ดิบ</div></div>
       </div>
+      ${headerCheckHtml(d.headerCheck)}
       <div class="mini-label">Machine ID 5 รายการล่าสุดในชีตนี้ (แถว ${Math.max(1,(d.dataLastRow||0)-4)}-${d.dataLastRow||0})</div>
       <div class="chips">${(d.lastMachineIds||[]).length?d.lastMachineIds.map(id=>`<span class="chip ${recentIds.includes(id)?'on':''}">${esc(id)}</span>`).join(''):'<span style="color:var(--muted)">ไม่พบข้อมูล</span>'}</div>
       ${recentIds.length?`<div class="banner ${seenHere.length?'ok':'warn'}" style="margin-top:10px">

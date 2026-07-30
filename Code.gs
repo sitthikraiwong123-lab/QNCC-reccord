@@ -241,7 +241,7 @@ function saveRecords(body) {
     });
 
     if (newRows.length) {
-      var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+      var startRow = lastRowByColumn(sh, col1(idx, 'Machine ID')) + 1;
       sh.getRange(startRow, 1, newRows.length, header.length).setValues(newRows);
     }
     return { written: newRows.length, skipped: skipped, results: results };
@@ -274,14 +274,14 @@ function updateRecord(rec) {
 
     var foundRow = findRowByClientId(sh, idx, rec.clientId);
     if (foundRow > 0) {
-      var seq = parseInt(sh.getRange(foundRow, idx['ลำดับ'] + 1).getValue(), 10) || getLastSeq(sh, idx) + 1;
+      var seq = parseInt(sh.getRange(foundRow, col1(idx, 'ลำดับ')).getValue(), 10) || getLastSeq(sh, idx) + 1;
       var row = buildRow(header, idx, rec, seq, typeCounts, allSymptoms);
       sh.getRange(foundRow, 1, 1, header.length).setValues([row]);
       return { ok: true, mode: 'updated', row: foundRow };
     }
     var newSeq = getLastSeq(sh, idx) + 1;
     var newRow = buildRow(header, idx, rec, newSeq, typeCounts, allSymptoms);
-    var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+    var startRow = lastRowByColumn(sh, col1(idx, 'Machine ID')) + 1;
     sh.getRange(startRow, 1, 1, header.length).setValues([newRow]);
     return { ok: true, mode: 'appended', row: startRow };
   } finally {
@@ -290,11 +290,10 @@ function updateRecord(rec) {
 }
 
 function findRowByClientId(sh, idx, clientId) {
-  var col = idx[CLIENT_ID_COL];
-  if (col == null) return 0;
+  if (idx[CLIENT_ID_COL] == null) return 0; // column not ensured yet — nothing to find
   var last = sh.getLastRow();
   if (last < 2) return 0;
-  var vals = sh.getRange(2, col + 1, last - 1, 1).getValues();
+  var vals = sh.getRange(2, col1(idx, CLIENT_ID_COL), last - 1, 1).getValues();
   for (var r = 0; r < vals.length; r++) {
     if (String(vals[r][0]) === String(clientId)) return r + 2; // 1-based sheet row
   }
@@ -479,11 +478,10 @@ function pointTypeCounts(ss) {
 
 function existingDupKeys(sh, idx) {
   var keys = {};
-  var last = lastRowByColumn(sh, idx['Machine ID'] + 1);
+  var last = lastRowByColumn(sh, col1(idx, 'Machine ID'));
   if (last < 2) return keys;
-  var dcol = idx['วันที่'] + 1, mcol = idx['Machine ID'] + 1;
-  var dates = sh.getRange(2, dcol, last - 1, 1).getValues();
-  var mids  = sh.getRange(2, mcol, last - 1, 1).getValues();
+  var dates = sh.getRange(2, col1(idx, 'วันที่'), last - 1, 1).getValues();
+  var mids  = sh.getRange(2, col1(idx, 'Machine ID'), last - 1, 1).getValues();
   for (var i = 0; i < dates.length; i++) {
     keys[fmtDate(dates[i][0]) + '|' + mids[i][0]] = true;
   }
@@ -491,10 +489,9 @@ function existingDupKeys(sh, idx) {
 }
 
 function getLastSeq(sh, idx) {
-  var last = lastRowByColumn(sh, idx['Machine ID'] + 1);
+  var last = lastRowByColumn(sh, col1(idx, 'Machine ID'));
   if (last < 2) return 0;
-  var col = idx['ลำดับ'] + 1;
-  var vals = sh.getRange(2, col, last - 1, 1).getValues();
+  var vals = sh.getRange(2, col1(idx, 'ลำดับ'), last - 1, 1).getValues();
   var max = 0;
   vals.forEach(function (v) { var n = parseInt(v[0], 10); if (n > max) max = n; });
   return max;
@@ -506,6 +503,17 @@ function autoRound(d) {
 }
 
 function set(row, idx, header, val) { if (idx[header] != null) row[idx[header]] = val; }
+
+/* 1-based column number for a header, or a clear, specific error instead of a
+ * cryptic Sheets API "range" exception if the header text doesn't match — e.g.
+ * because a column got renamed or retyped directly in the live sheet. */
+function col1(idx, headerName) {
+  var i = idx[headerName];
+  if (i == null) {
+    throw new Error('ไม่พบคอลัมน์ "' + headerName + '" ในชีต "' + SHEETS.LOG + '" — ตรวจสอบว่าหัวคอลัมน์แถวที่ 1 สะกดตรงกัน (คัดลอกจากไฟล์ Excel ต้นฉบับ ไม่พิมพ์ใหม่)');
+  }
+  return i + 1;
+}
 
 function cleanNum(v) {
   if (v === '' || v == null) return '';
@@ -533,14 +541,20 @@ function json(obj) {
  * needs a refresh/scroll to dataLastRow; if it doesn't, the write went somewhere
  * else or under a different identity and needs investigating further).
  */
+// Every header saveRecords/updateRecord relies on via col1() — checked explicitly
+// here so a mismatch (column renamed/retyped directly in the sheet) shows up as a
+// plain pass/fail list instead of only surfacing later as a cryptic write failure.
+var REQUIRED_HEADERS = ['ลำดับ', 'วันที่', 'รอบ', 'รหัสจุด', 'เลขเครื่อง', 'Machine ID', 'โซน', 'ชื่อโซน', 'สถานะ', 'ผู้บันทึก'];
+
 function diagnose() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEETS.LOG);
-  var idx = {}, rawLast = 0, dataLast = 0, lastIds = [];
+  var idx = {}, rawLast = 0, dataLast = 0, lastIds = [], headerCheck = [];
   if (sh) {
     rawLast = sh.getLastRow();
     var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
     header.forEach(function (h, i) { idx[h] = i; });
+    headerCheck = REQUIRED_HEADERS.map(function (name) { return { name: name, found: idx[name] != null }; });
     if (idx['Machine ID'] != null) {
       dataLast = lastRowByColumn(sh, idx['Machine ID'] + 1);
       if (dataLast >= 2) {
@@ -561,6 +575,7 @@ function diagnose() {
     rawLastRow: rawLast,       // sh.getLastRow() — can be inflated by formulas dragged far down
     dataLastRow: dataLast,     // last row with a real Machine ID — where the next write lands
     lastMachineIds: lastIds,   // the 5 most recent real entries, oldest first
+    headerCheck: headerCheck,  // pass/fail per header the write path depends on
     ts: new Date().toISOString()
   };
 }
