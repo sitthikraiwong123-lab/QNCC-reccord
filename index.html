@@ -880,14 +880,24 @@ async function syncNow(silent){
       const byId={}; (result.results||[]).forEach(r=>byId[r.clientId]=r);
       fresh.forEach(o=>{
         const r=byId[o.id];
-        if(r&&r.ok){ o.status='synced'; o.everSynced=true; delete o.dupBlocked; okCount++; }
-        else if(r&&r.reason==='duplicate'){ o.dupBlocked=true; dupCount++; }
+        if(r&&r.ok){ o.status='synced'; o.everSynced=true; delete o.dupBlocked; delete o.lastError; okCount++; }
+        else if(r&&r.reason==='duplicate'){ o.dupBlocked=true; delete o.lastError; dupCount++; }
+        else{ o.lastError='เซิร์ฟเวอร์ไม่ตอบกลับผลของรายการนี้ (อาจเป็นเวอร์ชัน Apps Script เก่า — ลอง Deploy เวอร์ชันใหม่)'; failCount++; }
       });
-    }catch(err){ failCount+=fresh.length; if(!silent)toast('ส่งไม่สำเร็จ: '+(err.message||err),'err'); }
+    }catch(err){
+      const msg=err&&err.message||String(err);
+      fresh.forEach(o=>{ o.lastError=msg; });
+      failCount+=fresh.length;
+      if(!silent)toast('ส่งไม่สำเร็จ: '+msg,'err');
+    }
   }
   for(const o of edited){
-    try{ await api.update({...o.rec,clientId:o.id,force:true}); o.status='synced'; okCount++; }
-    catch(err){ failCount++; if(!silent)toast(`แก้ไข ${o.rec.machineId} ไม่สำเร็จ: `+(err.message||err),'err'); }
+    try{ await api.update({...o.rec,clientId:o.id,force:true}); o.status='synced'; delete o.lastError; okCount++; }
+    catch(err){
+      const msg=err&&err.message||String(err);
+      o.lastError=msg; failCount++;
+      if(!silent)toast(`แก้ไข ${o.rec.machineId} ไม่สำเร็จ: `+msg,'err');
+    }
   }
 
   save(LS.OUTBOX,outbox);
@@ -923,7 +933,7 @@ function historyItemHtml(o){
   const badge=o.dupBlocked?'<span class="badge zone">ซ้ำในชีต</span>'
     :o.status==='synced'?'<span class="badge cnt">ส่งแล้ว</span>':'<span class="badge zone">รอส่ง</span>';
   const head=`<div class="out-item">
-      <div class="dot ${o.dupBlocked?'error':o.status}"></div>
+      <div class="dot ${o.dupBlocked?'error':(o.lastError&&o.status!=='synced')?'error':o.status}"></div>
       <div class="tx"><b>${esc(r.machineId)}</b>
         <span>${thaiDate(r.date)} · ${esc(r.status)} · พบ ${r.found.length} / ซ่อม ${r.repaired.length}</span></div>
       ${badge}
@@ -932,6 +942,10 @@ function historyItemHtml(o){
   if(o.dupBlocked){
     return head+`<div class="banner warn" style="margin:-4px 0 10px">รายการนี้ซ้ำกับข้อมูลที่มีอยู่แล้วในชีต (เครื่องเดิม+วันเดิม) จึงยังไม่ถูกเขียนซ้ำ
       <span class="link" onclick="forceSaveDup('${o.id}')">บันทึกซ้ำอยู่ดี (เช่น เข้าซ่อมรอบ 2)</span></div>`;
+  }
+  if(o.lastError&&o.status!=='synced'){
+    return head+`<div class="banner warn" style="margin:-4px 0 10px">ส่งไม่สำเร็จ: ${esc(o.lastError)}
+      <span class="link" onclick="syncNow()">ลองใหม่</span></div>`;
   }
   return head+(editingId===o.id?editFormHtml(o):'');
 }
