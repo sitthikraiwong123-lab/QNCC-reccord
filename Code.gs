@@ -25,6 +25,16 @@
  *   skipped as a same-day duplicate is reported, never silently swallowed);
  *   updateRecord() finds that same id later and overwrites the row in place — this is
  *   how the app lets a technician correct a mistake without creating a duplicate row.
+ * - Multiple technicians can use the app at the same time (each normally works a
+ *   different zone, so their Machine IDs never collide). saveRecords() and
+ *   updateRecord() each hold a script lock for their whole read-check-write section,
+ *   so two people saving in the same instant can't both read the sheet's state before
+ *   either writes — that race would otherwise let a genuine duplicate slip past the
+ *   dedupe check, or let one write clobber the other's target row. With the lock,
+ *   whoever's request reaches the server first is the one that gets written; the
+ *   other is reported as a duplicate (see the dedupe note above) rather than silently
+ *   overwriting or being lost, so it shows up on that technician's own device to
+ *   review and, if needed, force through or correct later.
  */
 
 /* ------------------------------------------------------------------ config */
@@ -192,43 +202,51 @@ function saveRecords(body) {
   var records = body.records || [];
   if (!records.length) return { written: 0, skipped: 0, results: [] };
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEETS.LOG);
-  if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
+  // Serialize against every other concurrent save/update so two technicians saving
+  // in the same instant can't both read the sheet's state before either writes —
+  // see the file header note on multi-technician use.
+  var lock = acquireLock();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(SHEETS.LOG);
+    if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
 
-  ensureExtraColumns(sh);
-  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
-  var idx = {};
-  header.forEach(function (h, i) { idx[h] = i; });
+    ensureExtraColumns(sh);
+    var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { idx[h] = i; });
 
-  var typeCounts = pointTypeCounts(ss);        // {pcode:{S,U,F,D}}
-  var existingKeys = existingDupKeys(sh, idx); // Set of "date|machineId" already in the sheet
-  var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+    var typeCounts = pointTypeCounts(ss);        // {pcode:{S,U,F,D}}
+    var existingKeys = existingDupKeys(sh, idx); // Set of "date|machineId" already in the sheet
+    var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
 
-  var lastSeq = getLastSeq(sh, idx);
-  var newRows = [], results = [], skipped = 0;
+    var lastSeq = getLastSeq(sh, idx);
+    var newRows = [], results = [], skipped = 0;
 
-  records.forEach(function (rec) {
-    var date = rec.date;                                   // 'YYYY-MM-DD'
-    var dupKey = date + '|' + rec.machineId;
-    if (existingKeys[dupKey] && !rec.force) {
-      skipped++;
-      results.push({ clientId: rec.clientId, ok: false, reason: 'duplicate' });
-      return;
+    records.forEach(function (rec) {
+      var date = rec.date;                                   // 'YYYY-MM-DD'
+      var dupKey = date + '|' + rec.machineId;
+      if (existingKeys[dupKey] && !rec.force) {
+        skipped++;
+        results.push({ clientId: rec.clientId, ok: false, reason: 'duplicate' });
+        return;
+      }
+      existingKeys[dupKey] = true;
+
+      lastSeq++;
+      var row = buildRow(header, idx, rec, lastSeq, typeCounts, allSymptoms);
+      newRows.push(row);
+      results.push({ clientId: rec.clientId, ok: true, seq: lastSeq });
+    });
+
+    if (newRows.length) {
+      var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+      sh.getRange(startRow, 1, newRows.length, header.length).setValues(newRows);
     }
-    existingKeys[dupKey] = true;
-
-    lastSeq++;
-    var row = buildRow(header, idx, rec, lastSeq, typeCounts, allSymptoms);
-    newRows.push(row);
-    results.push({ clientId: rec.clientId, ok: true, seq: lastSeq });
-  });
-
-  if (newRows.length) {
-    var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
-    sh.getRange(startRow, 1, newRows.length, header.length).setValues(newRows);
+    return { written: newRows.length, skipped: skipped, results: results };
+  } finally {
+    lock.releaseLock();
   }
-  return { written: newRows.length, skipped: skipped, results: results };
 }
 
 /**
@@ -239,29 +257,35 @@ function saveRecords(body) {
  */
 function updateRecord(rec) {
   if (!rec || !rec.clientId) throw new Error('ไม่มีรหัสรายการสำหรับอ้างอิง');
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEETS.LOG);
-  if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
 
-  ensureExtraColumns(sh);
-  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
-  var idx = {};
-  header.forEach(function (h, i) { idx[h] = i; });
-  var typeCounts = pointTypeCounts(ss);
-  var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+  var lock = acquireLock();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(SHEETS.LOG);
+    if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
 
-  var foundRow = findRowByClientId(sh, idx, rec.clientId);
-  if (foundRow > 0) {
-    var seq = parseInt(sh.getRange(foundRow, idx['ลำดับ'] + 1).getValue(), 10) || getLastSeq(sh, idx) + 1;
-    var row = buildRow(header, idx, rec, seq, typeCounts, allSymptoms);
-    sh.getRange(foundRow, 1, 1, header.length).setValues([row]);
-    return { ok: true, mode: 'updated', row: foundRow };
+    ensureExtraColumns(sh);
+    var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    var idx = {};
+    header.forEach(function (h, i) { idx[h] = i; });
+    var typeCounts = pointTypeCounts(ss);
+    var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+
+    var foundRow = findRowByClientId(sh, idx, rec.clientId);
+    if (foundRow > 0) {
+      var seq = parseInt(sh.getRange(foundRow, idx['ลำดับ'] + 1).getValue(), 10) || getLastSeq(sh, idx) + 1;
+      var row = buildRow(header, idx, rec, seq, typeCounts, allSymptoms);
+      sh.getRange(foundRow, 1, 1, header.length).setValues([row]);
+      return { ok: true, mode: 'updated', row: foundRow };
+    }
+    var newSeq = getLastSeq(sh, idx) + 1;
+    var newRow = buildRow(header, idx, rec, newSeq, typeCounts, allSymptoms);
+    var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+    sh.getRange(startRow, 1, 1, header.length).setValues([newRow]);
+    return { ok: true, mode: 'appended', row: startRow };
+  } finally {
+    lock.releaseLock();
   }
-  var newSeq = getLastSeq(sh, idx) + 1;
-  var newRow = buildRow(header, idx, rec, newSeq, typeCounts, allSymptoms);
-  var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
-  sh.getRange(startRow, 1, 1, header.length).setValues([newRow]);
-  return { ok: true, mode: 'appended', row: startRow };
 }
 
 function findRowByClientId(sh, idx, clientId) {
@@ -325,6 +349,20 @@ function buildRow(header, idx, rec, seq, typeCounts, allSymptoms) {
   set(row, idx, 'อาการที่ยังค้าง (รหัส+ชื่อ)', symText(pending));
   set(row, idx, CLIENT_ID_COL, rec.clientId || '');
   return row;
+}
+
+/* Serializes concurrent saveRecords/updateRecord calls (see the multi-technician
+ * note in the file header). A timeout here means the sheet was busy with another
+ * technician's save for 30s straight — rare, but report it plainly; the caller's
+ * item just stays "pending" and the app retries automatically on the next sync. */
+function acquireLock() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    throw new Error('ระบบกำลังบันทึกของอีกคนอยู่ ลองใหม่อีกครั้งในไม่กี่วินาที');
+  }
+  return lock;
 }
 
 function symText(list) {
