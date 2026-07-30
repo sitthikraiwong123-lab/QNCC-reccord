@@ -367,6 +367,16 @@
       <button class="btn btn-outline" onclick="runDiag()">🔍 ตรวจสอบตอนนี้</button>
       <div id="diagResult" style="margin-top:12px"></div>
     </div>
+    <div class="card">
+      <h2>เติมสูตรลงทุกแถวจนสุดชีต</h2>
+      <div class="sub">ลากสูตรของชีต "บันทึกการซ่อม" (Machine ID, โซน, ✓ อาการ, เดือน/ไตรมาส/ปี ฯลฯ)
+        ลงไปจนถึงแถวสุดท้าย เพื่อให้พิมพ์เองในชีตได้ทุกแถว — แอพจะเขียนเฉพาะช่องกรอก ไม่ทับสูตร</div>
+      <button class="btn btn-outline" onclick="runFillFormulas(false)">⬇️ เติมสูตรลงแถวว่างจนสุดชีต (ปลอดภัย)</button>
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="runFillFormulas(true)">🛠️ ซ่อมสูตรในแถวที่มีข้อมูลด้วย</button>
+      <div class="banner warn" style="margin-top:10px">ปุ่มที่สอง<b>เขียนสูตรทับ</b>เซลล์ในแถวที่มีข้อมูลอยู่แล้ว
+        ใช้เมื่อต้องการกู้สูตรในแถวที่แอพเวอร์ชันเก่าเคยเขียนค่าทับไว้ — สูตรจะคำนวณใหม่จากช่องกรอกที่ยังอยู่ในแถวนั้น</div>
+      <div id="fillResult" style="margin-top:12px"></div>
+    </div>
   </section>
 </main>
 
@@ -429,6 +439,7 @@ const api = {
      or append it fresh if it was never synced before — see updateRecord in Code.gs */
   update:      (rec)=> RUN ? gsRun('updateRecord',rec)    : postJSON(backendUrl,{action:'update',record:rec}).then(d=>d.result),
   diag:           ()=> RUN ? gsRun('diagnose')            : fetchJSON(backendUrl+'?action=diag').then(d=>d.diag),
+  fillFormulas:(opts)=> RUN ? gsRun('fillFormulasDown',opts||{}) : postJSON(backendUrl,{action:'fillformulas',options:opts||{}}).then(d=>d.result),
   /* filter: {zone?, point?, machineId?} — omit all for everything */
   history:       (f)=> RUN ? gsRun('queryHistory',f||{})
                            : fetchJSON(backendUrl+'?action=history&zone='+encodeURIComponent(f.zone||'')
@@ -1229,6 +1240,23 @@ function copyDiagUrl(){
   if(navigator.clipboard) navigator.clipboard.writeText(lastDiag.spreadsheetUrl);
   toast('คัดลอกลิงก์แล้ว');
 }
+async function runFillFormulas(repairExisting){
+  if(!RUN&&!backendUrl){$('fillResult').innerHTML='<div class="banner warn">ยังไม่ได้ตั้งค่า URL</div>';return}
+  if(repairExisting&&!confirm('จะเขียนสูตรทับเซลล์ในแถวที่มีข้อมูลอยู่แล้ว\n(สูตรจะคำนวณค่าใหม่จากช่องกรอกที่ยังอยู่ในแถวนั้น)\n\nแนะนำให้สำรองชีตไว้ก่อน — ยืนยันดำเนินการ?'))return;
+  $('fillResult').innerHTML='<div class="empty">กำลังเติมสูตร...</div>';
+  try{
+    const r=await api.fillFormulas({repairExistingRows:!!repairExisting});
+    if(!r.formulaColumns){
+      $('fillResult').innerHTML=`<div class="banner warn">${esc(r.note||'ไม่พบคอลัมน์สูตรในชีตนี้')}</div>`;return;
+    }
+    $('fillResult').innerHTML=`<div class="banner ok">✓ เติมสูตร ${r.formulaColumns} คอลัมน์
+      ลงแถวที่ ${r.fromRow}–${r.toRow} เรียบร้อย${r.repairedExisting?' (รวมแถวที่มีข้อมูลเดิม)':''}</div>`;
+    toast('เติมสูตรเรียบร้อย','ok');
+  }catch(err){
+    $('fillResult').innerHTML=`<div class="banner warn">เติมสูตรไม่สำเร็จ: ${esc(err.message||err)}</div>`;
+  }
+}
+
 function headerCheckHtml(list){
   if(!list||!list.length)return'';
   const bad=list.filter(h=>!h.found);
@@ -1255,6 +1283,12 @@ async function runDiag(){
         <div class="stat"><div class="v">${d.rawLastRow||0}</div><div class="l">getLastRow() ดิบ</div></div>
       </div>
       ${headerCheckHtml(d.headerCheck)}
+      ${d.formulaColumns!=null?`<div class="mini-label">สูตรในชีต</div>
+        <div class="banner ${(d.formulaColumns&&d.formulasReachRow>=d.maxRows)?'ok':(d.formulaColumns?'warn':'info')}">
+          ${d.formulaColumns?`พบคอลัมน์สูตร ${d.formulaColumns} คอลัมน์ · สูตรลากถึงแถว ${d.formulasReachRow} จากทั้งหมด ${d.maxRows} แถว
+            ${d.formulasReachRow>=d.maxRows?'✓ เต็มชีตแล้ว':'— ยังไม่สุดชีต กด "เติมสูตรลงทุกแถว" ด้านล่างได้'}`
+            :'ไม่พบคอลัมน์สูตร — แอพจะเขียนค่าที่คำนวณเองให้ทุกคอลัมน์'}
+        </div>`:''}
       <div class="mini-label">Machine ID 5 รายการล่าสุดในชีตนี้ (แถว ${Math.max(1,(d.dataLastRow||0)-4)}-${d.dataLastRow||0})</div>
       <div class="chips">${(d.lastMachineIds||[]).length?d.lastMachineIds.map(id=>`<span class="chip ${recentIds.includes(id)?'on':''}">${esc(id)}</span>`).join(''):'<span style="color:var(--muted)">ไม่พบข้อมูล</span>'}</div>
       ${recentIds.length?`<div class="banner ${seenHere.length?'ok':'warn'}" style="margin-top:10px">

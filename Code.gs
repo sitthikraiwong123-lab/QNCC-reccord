@@ -57,6 +57,12 @@ var STATUS_LIST = ['เสร็จสิ้น', 'เสร็จบางส�
 var ENSURE_COLS = ['ผู้บันทึก', 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', 'อาการที่ยังค้าง (รหัส+ชื่อ)', 'รหัสรายการ (App)'];
 var CLIENT_ID_COL = 'รหัสรายการ (App)';
 
+// The column every formula in this sheet guards on (they all start IF($B2="","",...)),
+// so a non-empty value here is what marks a row as "used". Anchoring the last-row scan
+// on it is safer than anchoring on Machine ID, which is itself a formula and stays ""
+// until the inputs on its row are filled in.
+var ROW_ANCHOR_COL = 'วันที่';
+
 /* ------------------------------------------------------------------ router */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || '';
@@ -84,7 +90,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents || '{}');
-    var result = body.action === 'update' ? updateRecord(body.record) : saveRecords(body);
+    var result = body.action === 'update'       ? updateRecord(body.record)
+               : body.action === 'fillformulas' ? fillFormulasDown(body.options)
+               : saveRecords(body);
     return json({ ok: true, result: result });
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
@@ -220,6 +228,7 @@ function saveRecords(body) {
     var typeCounts = pointTypeCounts(ss);        // {pcode:{S,U,F,D}}
     var existingKeys = existingDupKeys(sh, idx); // Set of "date|machineId" already in the sheet
     var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+    var tmpl = formulaTemplate(sh, header);      // columns the sheet computes for itself
 
     var lastSeq = getLastSeq(sh, idx);
     var newRows = [], results = [], skipped = 0;
@@ -241,8 +250,9 @@ function saveRecords(body) {
     });
 
     if (newRows.length) {
-      var startRow = lastRowByColumn(sh, col1(idx, 'Machine ID')) + 1;
-      sh.getRange(startRow, 1, newRows.length, header.length).setValues(newRows);
+      var startRow = lastRowByColumn(sh, col1(idx, ROW_ANCHOR_COL)) + 1;
+      applyFormulaTemplate(sh, tmpl, startRow, newRows.length, header.length);
+      writeRowsPreservingFormulas(sh, startRow, newRows, tmpl, header.length);
     }
     return { written: newRows.length, skipped: skipped, results: results };
   } finally {
@@ -271,18 +281,20 @@ function updateRecord(rec) {
     header.forEach(function (h, i) { idx[h] = i; });
     var typeCounts = pointTypeCounts(ss);
     var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+    var tmpl = formulaTemplate(sh, header);
 
     var foundRow = findRowByClientId(sh, idx, rec.clientId);
     if (foundRow > 0) {
       var seq = parseInt(sh.getRange(foundRow, col1(idx, 'ลำดับ')).getValue(), 10) || getLastSeq(sh, idx) + 1;
       var row = buildRow(header, idx, rec, seq, typeCounts, allSymptoms);
-      sh.getRange(foundRow, 1, 1, header.length).setValues([row]);
+      writeRowsPreservingFormulas(sh, foundRow, [row], tmpl, header.length);
       return { ok: true, mode: 'updated', row: foundRow };
     }
     var newSeq = getLastSeq(sh, idx) + 1;
     var newRow = buildRow(header, idx, rec, newSeq, typeCounts, allSymptoms);
-    var startRow = lastRowByColumn(sh, col1(idx, 'Machine ID')) + 1;
-    sh.getRange(startRow, 1, 1, header.length).setValues([newRow]);
+    var startRow = lastRowByColumn(sh, col1(idx, ROW_ANCHOR_COL)) + 1;
+    applyFormulaTemplate(sh, tmpl, startRow, 1, header.length);
+    writeRowsPreservingFormulas(sh, startRow, [newRow], tmpl, header.length);
     return { ok: true, mode: 'appended', row: startRow };
   } finally {
     lock.releaseLock();
@@ -367,6 +379,118 @@ function acquireLock() {
 
 function symText(list) {
   return (list || []).map(function (s) { return s.code + '  |  ' + s.name; }).join('\n');
+}
+
+/* ------------------------------------------------- formula-owned columns
+ * This workbook computes almost everything from a handful of typed inputs:
+ * ลำดับ, รอบ, ประเภทที่ใช้, Machine ID, ตรวจสอบ, โซน, ชื่อโซน, the per-symptom ✓ marks,
+ * อาการเสีย, สรุปอาการ, เดือน/ไตรมาส/ปี, คีย์ช่วงเวลา, pidx and cS..cD are all formulas
+ * driven by วันที่ / รหัสจุด / เลขเครื่อง / ประเภท / รหัสอาการ.
+ *
+ * So the app writes ONLY the input columns and leaves every formula cell untouched —
+ * one owner per column, no duplicated or contradictory values. Writing a plain value
+ * into a formula cell would delete that formula for good, which is exactly what made
+ * formulas stop partway down the sheet before this.
+ *
+ * Which columns are formulas is DETECTED from the sheet rather than hardcoded, so if
+ * someone converts a formula column to manual entry (or vice versa) the app follows
+ * suit: a column with a formula is left alone; a column without one gets the value the
+ * app computed for it. That also keeps the app working on a sheet whose formulas were
+ * removed entirely.
+ */
+function formulaTemplate(sh, header) {
+  var tmpl = {};                       // colIndex(0-based) -> source row holding its formula
+  var last = sh.getLastRow();
+  if (last < 2) return tmpl;
+  var scanTo = Math.min(last, 201);    // original pre-app rows carry the formulas
+  var formulas = sh.getRange(2, 1, scanTo - 1, header.length).getFormulas();
+  for (var c = 0; c < header.length; c++) {
+    for (var r = 0; r < formulas.length; r++) {
+      if (formulas[r][c]) { tmpl[c] = r + 2; break; }
+    }
+  }
+  return tmpl;
+}
+
+/* Write rows without disturbing formula cells: values go down in contiguous runs of
+ * non-formula columns, so formula columns in between are never overwritten. */
+function writeRowsPreservingFormulas(sh, startRow, rows, tmpl, headerLen) {
+  if (!rows.length) return;
+  var c = 0;
+  while (c < headerLen) {
+    if (tmpl[c] != null) { c++; continue; }          // formula owns this column
+    var runStart = c;
+    while (c < headerLen && tmpl[c] == null) c++;
+    var runLen = c - runStart;
+    var block = rows.map(function (row) { return row.slice(runStart, runStart + runLen); });
+    sh.getRange(startRow, runStart + 1, rows.length, runLen).setValues(block);
+  }
+}
+
+/* Make sure the given rows carry the sheet's formulas. A no-op when formulas were
+ * already filled down (the normal state once fillFormulasDown has been run). */
+function applyFormulaTemplate(sh, tmpl, startRow, numRows, headerLen) {
+  var cols = Object.keys(tmpl);
+  if (!cols.length || numRows < 1) return 0;
+  var existing = sh.getRange(startRow, 1, numRows, headerLen).getFormulas();
+  var filled = 0;
+  cols.forEach(function (key) {
+    var c = parseInt(key, 10);
+    var missing = false;
+    for (var r = 0; r < numRows; r++) { if (!existing[r][c]) { missing = true; break; } }
+    if (!missing) return;
+    sh.getRange(tmpl[c], c + 1).copyTo(
+      sh.getRange(startRow, c + 1, numRows, 1),
+      SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+    filled++;
+  });
+  return filled;
+}
+
+/**
+ * Drag every formula column down to the last row of the sheet, so manual typing works
+ * on any row and the app's appends land on rows that already compute themselves.
+ *
+ * By default this only touches rows BELOW the existing data — no existing value is
+ * altered. Pass {repairExistingRows:true} to also restore formulas over rows that
+ * already hold data: use that to repair rows written by an older version of this app,
+ * which wrote static values into formula cells. Those formulas recompute from the same
+ * inputs still present on the row, so the values come back equivalent — but it does
+ * overwrite whatever is currently in those cells, so it is opt-in.
+ */
+function fillFormulasDown(opts) {
+  opts = opts || {};
+  var lock = acquireLock();
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.LOG);
+    if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
+    ensureExtraColumns(sh);
+    var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    var idx = {}; header.forEach(function (h, i) { idx[h] = i; });
+    var tmpl = formulaTemplate(sh, header);
+    var cols = Object.keys(tmpl);
+    if (!cols.length) return { ok: true, formulaColumns: 0, fromRow: 0, toRow: 0, note: 'ไม่พบคอลัมน์สูตรในชีตนี้' };
+
+    var dataLast = lastRowByColumn(sh, col1(idx, ROW_ANCHOR_COL));
+    var maxRow = sh.getMaxRows();
+    var fromRow = opts.repairExistingRows ? 2 : Math.max(2, dataLast + 1);
+    if (fromRow > maxRow) return { ok: true, formulaColumns: cols.length, fromRow: 0, toRow: 0, note: 'ไม่มีแถวให้เติม' };
+    var numRows = maxRow - fromRow + 1;
+
+    cols.forEach(function (key) {
+      var c = parseInt(key, 10);
+      sh.getRange(tmpl[c], c + 1).copyTo(
+        sh.getRange(fromRow, c + 1, numRows, 1),
+        SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+    });
+    SpreadsheetApp.flush();
+    return {
+      ok: true, formulaColumns: cols.length, fromRow: fromRow, toRow: maxRow,
+      repairedExisting: !!opts.repairExistingRows, dataLastRow: dataLast
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* Last row that actually has a Machine ID, scanning from the bottom. Using this
@@ -478,7 +602,7 @@ function pointTypeCounts(ss) {
 
 function existingDupKeys(sh, idx) {
   var keys = {};
-  var last = lastRowByColumn(sh, col1(idx, 'Machine ID'));
+  var last = lastRowByColumn(sh, col1(idx, ROW_ANCHOR_COL));
   if (last < 2) return keys;
   var dates = sh.getRange(2, col1(idx, 'วันที่'), last - 1, 1).getValues();
   var mids  = sh.getRange(2, col1(idx, 'Machine ID'), last - 1, 1).getValues();
@@ -489,7 +613,7 @@ function existingDupKeys(sh, idx) {
 }
 
 function getLastSeq(sh, idx) {
-  var last = lastRowByColumn(sh, col1(idx, 'Machine ID'));
+  var last = lastRowByColumn(sh, col1(idx, ROW_ANCHOR_COL));
   if (last < 2) return 0;
   var vals = sh.getRange(2, col1(idx, 'ลำดับ'), last - 1, 1).getValues();
   var max = 0;
@@ -550,17 +674,28 @@ function diagnose() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEETS.LOG);
   var idx = {}, rawLast = 0, dataLast = 0, lastIds = [], headerCheck = [];
+  var formulaCols = 0, formulasReachRow = 0, maxRows = 0;
   if (sh) {
     rawLast = sh.getLastRow();
+    maxRows = sh.getMaxRows();
     var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
     header.forEach(function (h, i) { idx[h] = i; });
     headerCheck = REQUIRED_HEADERS.map(function (name) { return { name: name, found: idx[name] != null }; });
-    if (idx['Machine ID'] != null) {
-      dataLast = lastRowByColumn(sh, idx['Machine ID'] + 1);
-      if (dataLast >= 2) {
-        var n = Math.min(5, dataLast - 1);
-        var vals = sh.getRange(dataLast - n + 1, idx['Machine ID'] + 1, n, 1).getValues();
-        lastIds = vals.map(function (v) { return v[0]; }).filter(function (v) { return v; });
+    if (idx[ROW_ANCHOR_COL] != null) dataLast = lastRowByColumn(sh, idx[ROW_ANCHOR_COL] + 1);
+    if (idx['Machine ID'] != null && dataLast >= 2) {
+      var n = Math.min(5, dataLast - 1);
+      var vals = sh.getRange(dataLast - n + 1, idx['Machine ID'] + 1, n, 1).getValues();
+      lastIds = vals.map(function (v) { return v[0]; }).filter(function (v) { return v; });
+    }
+    // how far down do the sheet's own formulas currently reach?
+    var tmpl = formulaTemplate(sh, header);
+    var tcols = Object.keys(tmpl);
+    formulaCols = tcols.length;
+    if (formulaCols) {
+      var probe = parseInt(tcols[0], 10) + 1;
+      var colFormulas = sh.getRange(1, probe, maxRows, 1).getFormulas();
+      for (var r = colFormulas.length - 1; r >= 0; r--) {
+        if (colFormulas[r][0]) { formulasReachRow = r + 1; break; }
       }
     }
   }
@@ -576,6 +711,9 @@ function diagnose() {
     dataLastRow: dataLast,     // last row with a real Machine ID — where the next write lands
     lastMachineIds: lastIds,   // the 5 most recent real entries, oldest first
     headerCheck: headerCheck,  // pass/fail per header the write path depends on
+    maxRows: maxRows,             // total rows the sheet has
+    formulaColumns: formulaCols,  // columns the sheet computes for itself
+    formulasReachRow: formulasReachRow, // how far down those formulas are filled
     ts: new Date().toISOString()
   };
 }
