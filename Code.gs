@@ -3,19 +3,28 @@
  * Google Apps Script — bound to the existing "QSNCC Disinfection Machine Registry" spreadsheet.
  *
  * Endpoints
- *   doGet()                         → master data (zones/types/symptoms/models/statuses/points+machines)
- *   doGet(?action=history&machineId=X) → repair history for one machine
- *   doGet(?action=ping)             → health check
- *   doPost() {records:[...]}        → batch-write repair rows into "บันทึกการซ่อม"
+ *   doGet()                            → serves the app (HtmlService), same-origin so
+ *                                        google.script.run works with no CORS setup
+ *   doGet(?action=master)              → master data (zones/types/symptoms/models/points)
+ *   doGet(?action=history&zone=&point=&machineId=) → repair history, narrowed by whichever
+ *                                        of zone/point/machineId is given (drill-down)
+ *   doGet(?action=ping)                → health check
+ *   doPost() {records:[...]}           → batch-write new repair rows
+ *   doPost() {action:'update',record:{}} → overwrite a previously written row in place
  *
  * Design notes
  * - All reads/writes are HEADER-DRIVEN: columns are located by their Thai header text,
  *   so the script keeps working if columns are reordered, and future master symptoms
  *   automatically map to their per-symptom checkbox column.
  * - Existing report/summary sheets keep working because we fill the original columns.
- *   Two extra columns ("อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)", "อาการที่ยังค้าง (รหัส+ชื่อ)")
- *   are appended once if missing, so repaired/pending detail is preserved without
- *   disturbing existing formulas.
+ *   Extra columns (repaired/pending detail, and a hidden client-id used to find a row
+ *   again for correction) are appended once if missing, so nothing here disturbs
+ *   existing formulas.
+ * - Every write is keyed by a client-generated id stamped into "รหัสรายการ (App)".
+ *   saveRecords() appends new rows and reports success per record (a record silently
+ *   skipped as a same-day duplicate is reported, never silently swallowed);
+ *   updateRecord() finds that same id later and overwrites the row in place — this is
+ *   how the app lets a technician correct a mistake without creating a duplicate row.
  */
 
 /* ------------------------------------------------------------------ config */
@@ -32,7 +41,11 @@ var STATUS_LIST = ['เสร็จสิ้น', 'เสร็จบางส�
 // "ผู้บันทึก" already exists in the source sheet — kept here as a safety net so the
 // recorder is always trackable even on a sheet variant that lacks it. The two symptom
 // columns capture app-computed detail the original schema had no place for.
-var ENSURE_COLS = ['ผู้บันทึก', 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', 'อาการที่ยังค้าง (รหัส+ชื่อ)'];
+// "รหัสรายการ (App)" is a hidden tracking id: it lets the app find and overwrite the
+// exact row it wrote earlier when the user corrects a mistake, instead of appending
+// a duplicate row (see updateRecord()).
+var ENSURE_COLS = ['ผู้บันทึก', 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', 'อาการที่ยังค้าง (รหัส+ชื่อ)', 'รหัสรายการ (App)'];
+var CLIENT_ID_COL = 'รหัสรายการ (App)';
 
 /* ------------------------------------------------------------------ router */
 function doGet(e) {
@@ -60,7 +73,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents || '{}');
-    var result = saveRecords(body);
+    var result = body.action === 'update' ? updateRecord(body.record) : saveRecords(body);
     return json({ ok: true, result: result });
   } catch (err) {
     return json({ ok: false, error: String(err && err.message || err) });
@@ -167,10 +180,17 @@ function defaultSymptoms() {
   ];
 }
 
-/* --------------------------------------------------------------- write path */
+/* --------------------------------------------------------------- write path
+ * Every record the client sends carries a `clientId` (the app's local outbox
+ * item id). It is stamped into the hidden CLIENT_ID_COL column so a later
+ * correction (updateRecord) can find and overwrite that exact row instead of
+ * appending a duplicate. saveRecords() reports one result per clientId so the
+ * client only marks an item "synced" when the server actually confirms it —
+ * a record silently skipped as a duplicate is reported as skipped, not synced.
+ */
 function saveRecords(body) {
   var records = body.records || [];
-  if (!records.length) return { written: 0, skipped: 0, seq: [] };
+  if (!records.length) return { written: 0, skipped: 0, results: [] };
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEETS.LOG);
@@ -181,72 +201,150 @@ function saveRecords(body) {
   var idx = {};
   header.forEach(function (h, i) { idx[h] = i; });
 
-  var typeCounts = pointTypeCounts(ss);      // {pcode:{S,U,F,D}}
-  var existingKeys = existingDupKeys(sh, idx); // Set of "date|machineId"
+  var typeCounts = pointTypeCounts(ss);        // {pcode:{S,U,F,D}}
+  var existingKeys = existingDupKeys(sh, idx); // Set of "date|machineId" already in the sheet
+  var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
 
   var lastSeq = getLastSeq(sh, idx);
-  var newRows = [], seqOut = [], skipped = 0;
+  var newRows = [], results = [], skipped = 0;
 
   records.forEach(function (rec) {
     var date = rec.date;                                   // 'YYYY-MM-DD'
     var dupKey = date + '|' + rec.machineId;
-    if (existingKeys[dupKey] && !rec.force) { skipped++; return; }
+    if (existingKeys[dupKey] && !rec.force) {
+      skipped++;
+      results.push({ clientId: rec.clientId, ok: false, reason: 'duplicate' });
+      return;
+    }
     existingKeys[dupKey] = true;
 
     lastSeq++;
-    var row = new Array(header.length).fill('');
-    var d = new Date(date + 'T00:00:00');
-    var month = date.slice(0, 7);
-    var quarter = date.slice(0, 4) + '-Q' + (Math.floor(d.getMonth() / 3) + 1);
-    var round = rec.round || autoRound(d);
-    var tc = typeCounts[rec.pointCode] || {};
-
-    var found    = rec.found    || [];   // [{code,name}]
-    var repaired = rec.repaired || [];
-    var pending  = rec.pending  || [];
-
-    set(row, idx, 'ลำดับ', lastSeq);
-    set(row, idx, 'วันที่', date);
-    set(row, idx, 'รอบ', round);
-    set(row, idx, 'รหัสจุด', rec.pointCode);
-    set(row, idx, 'เลขเครื่อง', rec.num);
-    set(row, idx, 'ประเภท (เลือกเมื่อเลขซ้ำ)', rec.typeName);
-    set(row, idx, 'ประเภทที่ใช้', rec.typeName);
-    set(row, idx, 'Machine ID', rec.machineId);
-    set(row, idx, 'ตรวจสอบ', 'OK');
-    set(row, idx, 'โซน', rec.zone);
-    set(row, idx, 'ชื่อโซน', rec.zoneName);
-    set(row, idx, 'รหัสอาการ', found.map(function (s) { return s.code; }).join(','));
-    // per-symptom checkbox columns (header text == symptom name)
-    found.forEach(function (s) { if (idx[s.name] != null) row[idx[s.name]] = '✓'; });
-    set(row, idx, 'อาการเสีย', found.map(function (s) { return s.name; }).join(', '));
-    set(row, idx, 'สรุปอาการ (รหัส+ชื่อ)', symText(found));
-    set(row, idx, 'รายละเอียดอาการ/การซ่อม', rec.detail || '');
-    set(row, idx, 'สถานะ', rec.status);
-    set(row, idx, 'ผู้บันทึก', rec.recorder);
-    set(row, idx, 'หมายเหตุ', rec.note || '');
-    set(row, idx, 'เดือน', month);
-    set(row, idx, 'ไตรมาส', quarter);
-    set(row, idx, 'ปี', date.slice(0, 4));
-    set(row, idx, 'คีย์ช่วงเวลา', round);
-    set(row, idx, 'cS', tc.S || ''); set(row, idx, 'cU', tc.U || '');
-    set(row, idx, 'cF', tc.F || ''); set(row, idx, 'cD', tc.D || '');
-    // appended columns
-    set(row, idx, 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', symText(repaired));
-    set(row, idx, 'อาการที่ยังค้าง (รหัส+ชื่อ)', symText(pending));
-
+    var row = buildRow(header, idx, rec, lastSeq, typeCounts, allSymptoms);
     newRows.push(row);
-    seqOut.push({ machineId: rec.machineId, seq: lastSeq });
+    results.push({ clientId: rec.clientId, ok: true, seq: lastSeq });
   });
 
   if (newRows.length) {
-    sh.getRange(sh.getLastRow() + 1, 1, newRows.length, header.length).setValues(newRows);
+    var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+    sh.getRange(startRow, 1, newRows.length, header.length).setValues(newRows);
   }
-  return { written: newRows.length, skipped: skipped, seq: seqOut };
+  return { written: newRows.length, skipped: skipped, results: results };
+}
+
+/**
+ * Overwrite the row previously written for rec.clientId (a correction — e.g. the
+ * technician picked the wrong machine or symptom). If no row is found for that id
+ * (never synced before, or the row was deleted), it is appended as new instead, so
+ * this also works as the very first write for an item.
+ */
+function updateRecord(rec) {
+  if (!rec || !rec.clientId) throw new Error('ไม่มีรหัสรายการสำหรับอ้างอิง');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEETS.LOG);
+  if (!sh) throw new Error('ไม่พบชีต "' + SHEETS.LOG + '"');
+
+  ensureExtraColumns(sh);
+  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+  var idx = {};
+  header.forEach(function (h, i) { idx[h] = i; });
+  var typeCounts = pointTypeCounts(ss);
+  var allSymptoms = readSymptoms(ss); if (!allSymptoms.length) allSymptoms = defaultSymptoms();
+
+  var foundRow = findRowByClientId(sh, idx, rec.clientId);
+  if (foundRow > 0) {
+    var seq = parseInt(sh.getRange(foundRow, idx['ลำดับ'] + 1).getValue(), 10) || getLastSeq(sh, idx) + 1;
+    var row = buildRow(header, idx, rec, seq, typeCounts, allSymptoms);
+    sh.getRange(foundRow, 1, 1, header.length).setValues([row]);
+    return { ok: true, mode: 'updated', row: foundRow };
+  }
+  var newSeq = getLastSeq(sh, idx) + 1;
+  var newRow = buildRow(header, idx, rec, newSeq, typeCounts, allSymptoms);
+  var startRow = lastRowByColumn(sh, idx['Machine ID'] + 1) + 1;
+  sh.getRange(startRow, 1, 1, header.length).setValues([newRow]);
+  return { ok: true, mode: 'appended', row: startRow };
+}
+
+function findRowByClientId(sh, idx, clientId) {
+  var col = idx[CLIENT_ID_COL];
+  if (col == null) return 0;
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var vals = sh.getRange(2, col + 1, last - 1, 1).getValues();
+  for (var r = 0; r < vals.length; r++) {
+    if (String(vals[r][0]) === String(clientId)) return r + 2; // 1-based sheet row
+  }
+  return 0;
+}
+
+/* Fill one row's values from a record. Shared by saveRecords (batch append) and
+ * updateRecord (single-row overwrite) so both stay in sync with the schema. */
+function buildRow(header, idx, rec, seq, typeCounts, allSymptoms) {
+  var row = new Array(header.length).fill('');
+  var date = rec.date;
+  var d = new Date(date + 'T00:00:00');
+  var month = date.slice(0, 7);
+  var quarter = date.slice(0, 4) + '-Q' + (Math.floor(d.getMonth() / 3) + 1);
+  var round = rec.round || autoRound(d);
+  var tc = (typeCounts && typeCounts[rec.pointCode]) || {};
+
+  var found    = rec.found    || [];   // [{code,name}]
+  var repaired = rec.repaired || [];
+  var pending  = rec.pending  || [];
+
+  set(row, idx, 'ลำดับ', seq);
+  set(row, idx, 'วันที่', date);
+  set(row, idx, 'รอบ', round);
+  set(row, idx, 'รหัสจุด', rec.pointCode);
+  set(row, idx, 'เลขเครื่อง', rec.num);
+  set(row, idx, 'ประเภท (เลือกเมื่อเลขซ้ำ)', rec.typeName);
+  set(row, idx, 'ประเภทที่ใช้', rec.typeName);
+  set(row, idx, 'Machine ID', rec.machineId);
+  set(row, idx, 'ตรวจสอบ', 'OK');
+  set(row, idx, 'โซน', rec.zone);
+  set(row, idx, 'ชื่อโซน', rec.zoneName);
+  set(row, idx, 'รหัสอาการ', found.map(function (s) { return s.code; }).join(','));
+  // per-symptom checkbox columns (header text == symptom name) — clear any
+  // previous mark first so an edit that removes a symptom actually clears it.
+  (allSymptoms || []).forEach(function (s) {
+    if (idx[s.name] != null) row[idx[s.name]] = '';
+  });
+  found.forEach(function (s) { if (idx[s.name] != null) row[idx[s.name]] = '✓'; });
+  set(row, idx, 'อาการเสีย', found.map(function (s) { return s.name; }).join(', '));
+  set(row, idx, 'สรุปอาการ (รหัส+ชื่อ)', symText(found));
+  set(row, idx, 'รายละเอียดอาการ/การซ่อม', rec.detail || '');
+  set(row, idx, 'สถานะ', rec.status);
+  set(row, idx, 'ผู้บันทึก', rec.recorder);
+  set(row, idx, 'หมายเหตุ', rec.note || '');
+  set(row, idx, 'เดือน', month);
+  set(row, idx, 'ไตรมาส', quarter);
+  set(row, idx, 'ปี', date.slice(0, 4));
+  set(row, idx, 'คีย์ช่วงเวลา', round);
+  set(row, idx, 'cS', tc.S || ''); set(row, idx, 'cU', tc.U || '');
+  set(row, idx, 'cF', tc.F || ''); set(row, idx, 'cD', tc.D || '');
+  set(row, idx, 'อาการที่ซ่อมเสร็จ (รหัส+ชื่อ)', symText(repaired));
+  set(row, idx, 'อาการที่ยังค้าง (รหัส+ชื่อ)', symText(pending));
+  set(row, idx, CLIENT_ID_COL, rec.clientId || '');
+  return row;
 }
 
 function symText(list) {
   return (list || []).map(function (s) { return s.code + '  |  ' + s.name; }).join('\n');
+}
+
+/* Last row that actually has a Machine ID, scanning from the bottom. Using this
+ * instead of sh.getLastRow() matters on a sheet where helper formulas were once
+ * dragged down thousands of rows in advance (this workbook's log sheet was sized
+ * to 4000 rows): getLastRow() would report one of those far-below blank-but-
+ * formatted rows as "last", pushing new writes out of view of anyone scrolled to
+ * the actual data and making it look like nothing was saved. */
+function lastRowByColumn(sh, col1based) {
+  var last = sh.getLastRow();
+  if (last < 1) return 0;
+  var vals = sh.getRange(1, col1based, last, 1).getValues();
+  for (var r = vals.length - 1; r >= 0; r--) {
+    if (vals[r][0] !== '' && vals[r][0] != null) return r + 1;
+  }
+  return 0;
 }
 
 function ensureExtraColumns(sh) {
@@ -342,7 +440,7 @@ function pointTypeCounts(ss) {
 
 function existingDupKeys(sh, idx) {
   var keys = {};
-  var last = sh.getLastRow();
+  var last = lastRowByColumn(sh, idx['Machine ID'] + 1);
   if (last < 2) return keys;
   var dcol = idx['วันที่'] + 1, mcol = idx['Machine ID'] + 1;
   var dates = sh.getRange(2, dcol, last - 1, 1).getValues();
@@ -354,7 +452,7 @@ function existingDupKeys(sh, idx) {
 }
 
 function getLastSeq(sh, idx) {
-  var last = sh.getLastRow();
+  var last = lastRowByColumn(sh, idx['Machine ID'] + 1);
   if (last < 2) return 0;
   var col = idx['ลำดับ'] + 1;
   var vals = sh.getRange(2, col, last - 1, 1).getValues();

@@ -256,8 +256,8 @@
       <div class="arrow">›</div>
     </button>
     <button class="tile" onclick="show('s-outbox');renderOutbox()">
-      <div class="ic">☁️</div>
-      <div class="tx"><b>รายการรอ sync / ส่งขึ้น Sheets</b><span id="outboxLabel">0 รายการ</span></div>
+      <div class="ic">📝</div>
+      <div class="tx"><b>รายการที่บันทึกไป</b><span id="outboxLabel">ดูย้อนหลัง แก้ไขได้หากเลือกผิด</span></div>
       <div class="arrow">›</div>
     </button>
     <button class="tile" onclick="show('s-settings')">
@@ -318,12 +318,14 @@
     <div id="histResult"></div>
   </section>
 
-  <!-- ============ OUTBOX ============ -->
+  <!-- ============ OUTBOX / MY RECORDED ENTRIES ============ -->
   <section class="screen" id="s-outbox">
     <div id="outboxSummary"></div>
+    <div class="banner info">รายการที่บันทึกจากเครื่องนี้ ปกติจะส่งขึ้น Google Sheets ให้อัตโนมัติทันทีหลังกด “บันทึกทั้งหมด”
+      แตะ ✏️ เพื่อแก้ไข หากเลือกเครื่อง/อาการผิด — ระบบจะอัปเดตแถวเดิมในชีต ไม่สร้างแถวซ้ำ</div>
     <div class="btn-row" style="margin-bottom:12px">
-      <button class="btn btn-primary sm" style="width:auto;flex:1" onclick="syncNow()">🔄 ส่งขึ้น Google Sheets</button>
-      <button class="btn btn-ghost sm" style="width:auto;flex:1" onclick="clearSynced()">ล้างที่ส่งแล้ว</button>
+      <button class="btn btn-outline sm" style="width:auto;flex:1" onclick="syncNow()">🔄 ลองส่งใหม่ (กรณีเพิ่งกลับมามีสัญญาณ)</button>
+      <button class="btn btn-ghost sm" style="width:auto;flex:1" onclick="clearSynced()">ล้างที่ส่งแล้วออกจากเครื่องนี้</button>
     </div>
     <div id="outboxList"></div>
   </section>
@@ -416,6 +418,9 @@ async function postJSON(url,body){const r=await fetch(url,{method:'POST',headers
 const api = {
   getMaster:      ()=> RUN ? gsRun('getMasterData')      : fetchJSON(backendUrl+'?action=master').then(d=>d.data),
   save:    (records)=> RUN ? gsRun('saveRecords',{records}) : postJSON(backendUrl,{records}).then(d=>d.result),
+  /* overwrite the row previously written for rec.clientId in place (a correction),
+     or append it fresh if it was never synced before — see updateRecord in Code.gs */
+  update:      (rec)=> RUN ? gsRun('updateRecord',rec)    : postJSON(backendUrl,{action:'update',record:rec}).then(d=>d.result),
   /* filter: {zone?, point?, machineId?} — omit all for everything */
   history:       (f)=> RUN ? gsRun('queryHistory',f||{})
                            : fetchJSON(backendUrl+'?action=history&zone='+encodeURIComponent(f.zone||'')
@@ -481,7 +486,7 @@ applyFont();
 
 /* ---- navigation ---- */
 const TITLES={'s-home':'บันทึกการซ่อม','s-points':'เลือกจุดติดตั้ง','s-machines':'เลือกเครื่อง',
-  's-detail':'กรอกรายละเอียด','s-history':'ประวัติการซ่อม','s-outbox':'รายการรอ sync','s-settings':'ตั้งค่า'};
+  's-detail':'กรอกรายละเอียด','s-history':'ประวัติการซ่อม','s-outbox':'รายการที่บันทึกไป','s-settings':'ตั้งค่า'};
 function show(id, push=true){
   if(push && navStack[navStack.length-1]!==currentScreen()) navStack.push(currentScreen());
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -517,7 +522,7 @@ function renderProgress(){
   $('stMachines').textContent=mine.length;
   $('stPending').textContent=outbox.filter(o=>o.status!=='synced').length;
   $('roundLabel').textContent=session&&session.date?`${thaiDate(session.date)} · ${session.round}${session.recorder?' · '+session.recorder:''}`:'—';
-  $('outboxLabel').textContent=outbox.filter(o=>o.status!=='synced').length+' รายการรอส่ง';
+  $('outboxLabel').textContent=outbox.length?`${outbox.length} รายการ${outbox.some(o=>o.status!=='synced')?' · '+outbox.filter(o=>o.status!=='synced').length+' รอส่ง':''}`:'ดูย้อนหลัง แก้ไขได้หากเลือกผิด';
   $('pointCountLabel').textContent=(MASTER.points.length||0)+' จุด · '+(MASTER.meta.machineCount||countMachines())+' เครื่อง';
 }
 function countMachines(){return MASTER.points.reduce((s,p)=>s+p.machines.length,0)}
@@ -786,7 +791,14 @@ function statusClass(s){
   return{cls:'pending',label:s};
 }
 
-/* ---- save (batch → outbox → sync) ---- */
+/* ---- save (batch → outbox → auto-sync immediately) ----
+   Each outbox item keeps `everSynced`: false until the server first confirms the
+   row was written. That flag decides how a later correction gets sent — see
+   syncNow(). Re-selecting the same machine/date from the machine picker is a
+   deliberate second visit (e.g. a repeat repair the same day), not a correction,
+   so it is threaded through as rec.force so the backend doesn't silently skip it
+   as a duplicate; a *correction* to a mistake goes through the history screen's
+   edit-in-place flow instead (updateRecord), which overwrites the same row. */
 function saveAll(){
   const ids=Object.keys(selected);
   if(!ids.length)return;
@@ -798,14 +810,16 @@ function saveAll(){
     if(!found.length)return null;
     const repaired=[...d.repaired].map(c=>({code:c,name:symName(c)}));
     const pending=[...d.found].filter(c=>!d.repaired.has(c)).map(c=>({code:c,name:symName(c)}));
-    if(outbox.some(o=>o.rec.machineId===id&&o.rec.date===session.date))dups.push(id);
+    const isDup=outbox.some(o=>o.rec.machineId===id&&o.rec.date===session.date);
+    if(isDup)dups.push(id);
     return {
-      id:'ob_'+Date.now()+'_'+id, status:'pending', periodKey,
+      id:'ob_'+Date.now()+'_'+id, status:'pending', everSynced:false, periodKey,
       rec:{
         date:session.date, round:session.date.slice(0,7)+'-'+session.round, recorder:session.recorder,
         pointCode:m.pointCode||curPoint.code, zone:curPoint.zone, zoneName:curPoint.zname,
         machineId:id, num:m.num, typeName:typeName(m.type),
-        found, repaired, pending, status:computeStatus(d), detail:d.detail, note:d.note
+        found, repaired, pending, status:computeStatus(d), detail:d.detail, note:d.note,
+        force:isDup
       }
     };
   }).filter(Boolean);
@@ -816,13 +830,13 @@ function saveAll(){
     if(!confirm(`มี ${missing.length} เครื่องที่ยังไม่เลือกอาการ จะถูกข้าม — บันทึกเฉพาะเครื่องที่กรอกครบ?`))return;
   }
   if(dups.length){
-    if(!confirm(`เครื่อง ${dups.join(', ')} เคยบันทึกในวันที่นี้แล้ว — ต้องการบันทึกซ้ำหรือไม่?`))return;
+    if(!confirm(`เครื่อง ${dups.join(', ')} เคยบันทึกในวันที่นี้แล้ว — ต้องการบันทึกซ้ำ (เช่น เข้าซ่อมรอบที่ 2 วันเดียวกัน) หรือไม่?\n\n(หากแค่เลือกผิดและอยากแก้ไขของเดิม ให้ยกเลิกแล้วไปแก้ที่หน้า “รายการที่บันทึกไป” แทน)`))return;
   }
   outbox=outbox.concat(newItems);
   save(LS.OUTBOX,outbox);
   rememberRecorder(session.recorder);
   selected={};details={};
-  toast(`บันทึก ${newItems.length} รายการแล้ว`,'ok');
+  toast(`บันทึก ${newItems.length} รายการแล้ว กำลังส่งขึ้น Sheets...`,'ok');
   renderProgress();
   syncNow(true);
   show('s-home',false);navStack=[];
@@ -833,53 +847,158 @@ function rememberRecorder(name){
   if(!rs.includes(name)){rs.push(name);save(LS.RECORDERS,rs);fillRecorders()}
 }
 
-/* ---- sync ---- */
+/* ---- sync ----
+   Fires automatically right after every save (and on reconnect) — there is no
+   separate "press to upload" step. Items that have never been confirmed written
+   go through the batch append (api.save); items the user corrected after an
+   earlier successful sync go through api.update, which overwrites that same row
+   instead of appending a duplicate. Only records the server actually confirms
+   get marked "synced" — one silently skipped as a same-day duplicate is flagged
+   (dupBlocked) and shown in history instead of being marked synced by mistake. */
 async function syncNow(silent){
   const pend=outbox.filter(o=>o.status!=='synced');
   if(!pend.length){if(!silent)toast('ไม่มีรายการรอส่ง');return}
   if(!RUN && !backendUrl){if(!silent)toast('ยังไม่ได้ตั้งค่า Web App URL','err');updateSyncBanner();return}
   if(!online()){if(!silent)toast('ออฟไลน์ — จะส่งอัตโนมัติเมื่อมีสัญญาณ','err');updateSyncBanner();return}
   if(!silent)toast('กำลังส่ง...');
-  try{
-    const result=await api.save(pend.map(o=>o.rec));
-    pend.forEach(o=>o.status='synced');
-    save(LS.OUTBOX,outbox);
-    toast(`ส่งขึ้น Sheets แล้ว ${result.written} รายการ`+(result.skipped?` (ข้ามซ้ำ ${result.skipped})`:''),'ok');
-  }catch(err){
-    pend.forEach(o=>{if(o.status!=='synced')o.status='pending'});
-    save(LS.OUTBOX,outbox);
-    if(!silent)toast('ส่งไม่สำเร็จ: '+(err.message||err),'err');
+
+  const fresh=pend.filter(o=>!o.everSynced);
+  const edited=pend.filter(o=>o.everSynced);
+  let okCount=0, dupCount=0, failCount=0;
+
+  if(fresh.length){
+    try{
+      const result=await api.save(fresh.map(o=>({...o.rec,clientId:o.id})));
+      const byId={}; (result.results||[]).forEach(r=>byId[r.clientId]=r);
+      fresh.forEach(o=>{
+        const r=byId[o.id];
+        if(r&&r.ok){ o.status='synced'; o.everSynced=true; delete o.dupBlocked; okCount++; }
+        else if(r&&r.reason==='duplicate'){ o.dupBlocked=true; dupCount++; }
+      });
+    }catch(err){ failCount+=fresh.length; if(!silent)toast('ส่งไม่สำเร็จ: '+(err.message||err),'err'); }
+  }
+  for(const o of edited){
+    try{ await api.update({...o.rec,clientId:o.id,force:true}); o.status='synced'; okCount++; }
+    catch(err){ failCount++; if(!silent)toast(`แก้ไข ${o.rec.machineId} ไม่สำเร็จ: `+(err.message||err),'err'); }
+  }
+
+  save(LS.OUTBOX,outbox);
+  if(!silent||okCount||dupCount){
+    if(dupCount&&!failCount) toast(`ส่งสำเร็จ ${okCount} รายการ`+(dupCount?` · ${dupCount} รายการซ้ำกับข้อมูลเดิม ดูที่ “รายการที่บันทึกไป”`:''),'ok');
+    else if(failCount) toast(`ส่งสำเร็จ ${okCount} รายการ, ล้มเหลว ${failCount} รายการ (จะลองใหม่อัตโนมัติ)`,'err');
+    else if(!silent) toast(`ส่งขึ้น Sheets แล้ว ${okCount} รายการ`,'ok');
   }
   renderProgress();updateSyncBanner();renderOutbox();
 }
 function updateSyncBanner(){
-  const n=outbox.filter(o=>o.status!=='synced').length;
+  const n=outbox.filter(o=>o.status!=='synced'&&!o.dupBlocked).length;
   const b=$('syncBanner');
   if(!n){b.innerHTML='';return}
-  b.innerHTML=`<div class="banner warn">☁️ มี ${n} รายการรอส่งขึ้น Google Sheets
-    <span class="link" onclick="syncNow()">ส่งเดี๋ยวนี้</span></div>`;
+  b.innerHTML=`<div class="banner warn">☁️ มี ${n} รายการยังส่งไม่สำเร็จ (จะลองใหม่อัตโนมัติเมื่อมีสัญญาณ)
+    <span class="link" onclick="syncNow()">ลองตอนนี้</span></div>`;
 }
 
-/* ---- outbox screen ---- */
+/* ---- "รายการที่บันทึกไป" screen — history of this device's entries, editable ---- */
+let editingId=null, editState={};
 function renderOutbox(){
   const pend=outbox.filter(o=>o.status!=='synced').length;
   const done=outbox.length-pend;
-  $('outboxSummary').innerHTML=`<div class="card"><h2>สถานะการส่งข้อมูล</h2>
-    <div class="stat-row"><div class="stat"><div class="v">${pend}</div><div class="l">รอส่ง</div></div>
-    <div class="stat"><div class="v">${done}</div><div class="l">ส่งแล้ว</div></div>
-    <div class="stat"><div class="v">${online()?'●':'○'}</div><div class="l">${online()?'ออนไลน์':'ออฟไลน์'}</div></div></div></div>`;
+  $('outboxSummary').innerHTML=`<div class="card"><h2>สรุป</h2>
+    <div class="stat-row"><div class="stat"><div class="v">${outbox.length}</div><div class="l">รายการทั้งหมด</div></div>
+    <div class="stat"><div class="v">${done}</div><div class="l">ส่งขึ้น Sheets แล้ว</div></div>
+    <div class="stat"><div class="v">${pend}</div><div class="l">รอส่ง</div></div></div></div>`;
   const list=[...outbox].reverse();
-  $('outboxList').innerHTML=list.length?list.map(o=>`
-    <div class="out-item"><div class="dot ${o.status}"></div>
-      <div class="tx"><b>${esc(o.rec.machineId)}</b>
-        <span>${thaiDate(o.rec.date)} · ${esc(o.rec.status)} · พบ ${o.rec.found.length} / ซ่อม ${o.rec.repaired.length}</span></div>
-      <span class="badge ${o.status==='synced'?'cnt':'zone'}">${o.status==='synced'?'ส่งแล้ว':'รอส่ง'}</span>
-    </div>`).join(''):'<div class="empty">ยังไม่มีรายการ</div>';
+  $('outboxList').innerHTML=list.length?list.map(o=>historyItemHtml(o)).join(''):'<div class="empty">ยังไม่มีรายการ</div>';
+}
+function historyItemHtml(o){
+  const r=o.rec;
+  const badge=o.dupBlocked?'<span class="badge zone">ซ้ำในชีต</span>'
+    :o.status==='synced'?'<span class="badge cnt">ส่งแล้ว</span>':'<span class="badge zone">รอส่ง</span>';
+  const head=`<div class="out-item">
+      <div class="dot ${o.dupBlocked?'error':o.status}"></div>
+      <div class="tx"><b>${esc(r.machineId)}</b>
+        <span>${thaiDate(r.date)} · ${esc(r.status)} · พบ ${r.found.length} / ซ่อม ${r.repaired.length}</span></div>
+      ${badge}
+      <button class="icon-btn" title="แก้ไข" onclick="toggleEdit('${o.id}')">✏️</button>
+    </div>`;
+  if(o.dupBlocked){
+    return head+`<div class="banner warn" style="margin:-4px 0 10px">รายการนี้ซ้ำกับข้อมูลที่มีอยู่แล้วในชีต (เครื่องเดิม+วันเดิม) จึงยังไม่ถูกเขียนซ้ำ
+      <span class="link" onclick="forceSaveDup('${o.id}')">บันทึกซ้ำอยู่ดี (เช่น เข้าซ่อมรอบ 2)</span></div>`;
+  }
+  return head+(editingId===o.id?editFormHtml(o):'');
+}
+function toggleEdit(id){
+  if(editingId===id){editingId=null;delete editState[id];renderOutbox();return}
+  const o=outbox.find(x=>x.id===id); if(!o)return;
+  editingId=id;
+  editState[id]={
+    found:new Set(o.rec.found.map(s=>s.code)),
+    repaired:new Set(o.rec.repaired.map(s=>s.code)),
+    status:o.rec.status, note:o.rec.note||''
+  };
+  renderOutbox();
+}
+function editFormHtml(o){
+  const st=editState[o.id], foundArr=[...st.found];
+  return `<div class="card" style="margin:-4px 0 12px;border-radius:0 0 14px 14px">
+    <div class="mini-label">อาการที่พบ</div>
+    <div class="chips">${MASTER.symptoms.map(s=>`
+      <button class="chip ${st.found.has(s.code)?'on':''}" onclick="editToggleFound('${o.id}','${s.code}')">${esc(s.name)}</button>`).join('')}</div>
+    <div class="mini-label">อาการที่ซ่อมเสร็จ</div>
+    <div class="chips">${foundArr.length?foundArr.map(c=>`
+      <button class="chip rep ${st.repaired.has(c)?'on':''}" onclick="editToggleRepaired('${o.id}','${c}')">${esc(symName(c))}</button>`).join(''):
+      '<span style="color:var(--muted);font-size:calc(13px * var(--fs))">เลือกอาการที่พบก่อน</span>'}</div>
+    <div class="mini-label">สถานะ</div>
+    <select onchange="editSetField('${o.id}','status',this.value)">
+      ${MASTER.statuses.map(s=>`<option value="${esc(s)}" ${st.status===s?'selected':''}>${esc(s)}</option>`).join('')}
+    </select>
+    <div class="mini-label">หมายเหตุ</div>
+    <input type="text" value="${esc(st.note)}" oninput="editSetField('${o.id}','note',this.value)" />
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-primary sm" style="flex:1" onclick="saveEdit('${o.id}')">💾 บันทึกการแก้ไข</button>
+      <button class="btn btn-ghost sm" style="flex:1" onclick="toggleEdit('${o.id}')">ยกเลิก</button>
+    </div>
+  </div>`;
+}
+function editToggleFound(id,code){
+  const st=editState[id];
+  if(st.found.has(code)){st.found.delete(code);st.repaired.delete(code)}else st.found.add(code);
+  renderOutbox();
+}
+function editToggleRepaired(id,code){
+  const st=editState[id];
+  if(!st.found.has(code))return;
+  st.repaired.has(code)?st.repaired.delete(code):st.repaired.add(code);
+  renderOutbox();
+}
+function editSetField(id,f,v){editState[id][f]=v}
+function saveEdit(id){
+  const o=outbox.find(x=>x.id===id); if(!o)return;
+  const st=editState[id];
+  if(!st.found.size){toast('เลือกอาการที่พบอย่างน้อย 1 อย่าง','err');return}
+  const found=[...st.found].map(c=>({code:c,name:symName(c)}));
+  const repaired=[...st.repaired].map(c=>({code:c,name:symName(c)}));
+  const pending=[...st.found].filter(c=>!st.repaired.has(c)).map(c=>({code:c,name:symName(c)}));
+  o.rec.found=found; o.rec.repaired=repaired; o.rec.pending=pending;
+  o.rec.status=st.status; o.rec.note=st.note;
+  o.status='pending';                         // needs resync — everSynced stays true → routed through api.update
+  editingId=null; delete editState[id];
+  save(LS.OUTBOX,outbox);
+  toast('แก้ไขแล้ว กำลังส่งขึ้น Sheets...');
+  renderOutbox();renderProgress();updateSyncBanner();
+  syncNow(true);
+}
+function forceSaveDup(id){
+  const o=outbox.find(x=>x.id===id); if(!o)return;
+  o.rec.force=true; delete o.dupBlocked; o.status='pending';
+  save(LS.OUTBOX,outbox);
+  renderOutbox();
+  syncNow();
 }
 function clearSynced(){
   outbox=outbox.filter(o=>o.status!=='synced');
   save(LS.OUTBOX,outbox);renderOutbox();renderProgress();updateSyncBanner();
-  toast('ล้างรายการที่ส่งแล้ว');
+  toast('ล้างรายการที่ส่งแล้วออกจากเครื่องนี้แล้ว');
 }
 
 /* ---- history ----
