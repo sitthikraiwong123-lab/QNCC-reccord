@@ -68,6 +68,7 @@ function doGet(e) {
       machineId: e.parameter.machineId || ''
     }) });
     if (action === 'master')  return json({ ok: true, data: getMasterData() });
+    if (action === 'diag')    return json({ ok: true, diag: diagnose() });
     // Default: serve the app itself. Same-origin as the backend → no CORS, and the
     // client talks to the server via google.script.run (see index.html). This is the
     // only reliable pattern when the Workspace forbids anonymous ("Anyone") web apps.
@@ -521,4 +522,45 @@ function fmtDate(v) {
 
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ------------------------------------------------------------------ diagnostics
+ * Answers "did my save actually land, and in which file?" directly and falsifiably —
+ * for when the technician sees "synced" in the app but the sheet they have open
+ * looks unchanged. Compare spreadsheetUrl against the tab you're viewing (rules out
+ * looking at a different copy of the workbook) and check whether lastMachineIds
+ * includes what you just entered (if it does, the write landed — the sheet tab just
+ * needs a refresh/scroll to dataLastRow; if it doesn't, the write went somewhere
+ * else or under a different identity and needs investigating further).
+ */
+function diagnose() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEETS.LOG);
+  var idx = {}, rawLast = 0, dataLast = 0, lastIds = [];
+  if (sh) {
+    rawLast = sh.getLastRow();
+    var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    header.forEach(function (h, i) { idx[h] = i; });
+    if (idx['Machine ID'] != null) {
+      dataLast = lastRowByColumn(sh, idx['Machine ID'] + 1);
+      if (dataLast >= 2) {
+        var n = Math.min(5, dataLast - 1);
+        var vals = sh.getRange(dataLast - n + 1, idx['Machine ID'] + 1, n, 1).getValues();
+        lastIds = vals.map(function (v) { return v[0]; }).filter(function (v) { return v; });
+      }
+    }
+  }
+  var executingAs = '';
+  try { executingAs = Session.getEffectiveUser().getEmail(); } catch (e) { /* scope not granted — skip */ }
+  return {
+    spreadsheetName: ss.getName(),
+    spreadsheetUrl: ss.getUrl(),
+    spreadsheetId: ss.getId(),
+    executingAs: executingAs,
+    logSheetFound: !!sh,
+    rawLastRow: rawLast,       // sh.getLastRow() — can be inflated by formulas dragged far down
+    dataLastRow: dataLast,     // last row with a real Machine ID — where the next write lands
+    lastMachineIds: lastIds,   // the 5 most recent real entries, oldest first
+    ts: new Date().toISOString()
+  };
 }

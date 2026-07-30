@@ -360,6 +360,13 @@
       <div class="sub" id="masterMeta"></div>
       <div class="banner info" style="margin:0">แอพมาพร้อมชุดข้อมูลตั้งต้นจากไฟล์ Excel จึงใช้งานออฟไลน์ได้ทันที เมื่อเชื่อมต่อ Web App จะดึงทะเบียนล่าสุดมาแทน</div>
     </div>
+    <div class="card">
+      <h2>ตรวจสอบว่าบันทึกลงชีตไหน</h2>
+      <div class="sub">ใช้ตอนแอพขึ้น "ส่งแล้ว" แต่เปิดชีตแล้วไม่เห็นแถวใหม่ — เทียบชื่อไฟล์/ลิงก์ที่นี่กับแท็บที่เปิดดูอยู่
+        และดูว่า Machine ID ล่าสุดที่บันทึกไปโผล่ในนี้หรือไม่</div>
+      <button class="btn btn-outline" onclick="runDiag()">🔍 ตรวจสอบตอนนี้</button>
+      <div id="diagResult" style="margin-top:12px"></div>
+    </div>
   </section>
 </main>
 
@@ -421,6 +428,7 @@ const api = {
   /* overwrite the row previously written for rec.clientId in place (a correction),
      or append it fresh if it was never synced before — see updateRecord in Code.gs */
   update:      (rec)=> RUN ? gsRun('updateRecord',rec)    : postJSON(backendUrl,{action:'update',record:rec}).then(d=>d.result),
+  diag:           ()=> RUN ? gsRun('diagnose')            : fetchJSON(backendUrl+'?action=diag').then(d=>d.diag),
   /* filter: {zone?, point?, machineId?} — omit all for everything */
   history:       (f)=> RUN ? gsRun('queryHistory',f||{})
                            : fetchJSON(backendUrl+'?action=history&zone='+encodeURIComponent(f.zone||'')
@@ -1150,6 +1158,44 @@ async function refreshMaster(silent){
 function updateConnLabel(){$('connLabel').textContent=RUN?'เชื่อมต่อผ่าน Apps Script':(backendUrl?'เชื่อมต่อแล้ว':'ยังไม่เชื่อมต่อ (ออฟไลน์)')}
 function updateMasterMeta(){
   $('masterMeta').textContent=`${MASTER.points.length} จุด · ${MASTER.meta.machineCount||countMachines()} เครื่อง · ${MASTER.symptoms.length} อาการ · ${MASTER.zones.length} โซน`;
+}
+
+/* ---- diagnostics: prove exactly where a save landed ---- */
+let lastDiag=null;
+function copyDiagUrl(){
+  if(!lastDiag)return;
+  if(navigator.clipboard) navigator.clipboard.writeText(lastDiag.spreadsheetUrl);
+  toast('คัดลอกลิงก์แล้ว');
+}
+async function runDiag(){
+  if(!RUN&&!backendUrl){$('diagResult').innerHTML='<div class="banner warn">ยังไม่ได้ตั้งค่า URL</div>';return}
+  $('diagResult').innerHTML='<div class="empty">กำลังตรวจสอบ...</div>';
+  try{
+    const d=await api.diag();
+    lastDiag=d;
+    const recentIds=(outbox.length?outbox.slice(-5).map(o=>o.rec.machineId):[]);
+    const seenHere=recentIds.filter(id=>(d.lastMachineIds||[]).includes(id));
+    $('diagResult').innerHTML=`
+      <div class="banner ${d.logSheetFound?'ok':'warn'}">
+        <b>ไฟล์ที่กำลังเขียนถึง:</b> ${esc(d.spreadsheetName)}<br/>
+        <span style="font-size:calc(12px * var(--fs));word-break:break-all">${esc(d.spreadsheetUrl)}</span>
+        <div style="margin-top:8px"><span class="link" onclick="copyDiagUrl()">คัดลอกลิงก์นี้ไปเทียบกับแท็บที่เปิดอยู่</span></div>
+      </div>
+      <div class="stat-row" style="margin:12px 0">
+        <div class="stat"><div class="v">${d.dataLastRow||0}</div><div class="l">แถวข้อมูลจริงล่าสุด</div></div>
+        <div class="stat"><div class="v">${d.rawLastRow||0}</div><div class="l">getLastRow() ดิบ</div></div>
+      </div>
+      <div class="mini-label">Machine ID 5 รายการล่าสุดในชีตนี้ (แถว ${Math.max(1,(d.dataLastRow||0)-4)}-${d.dataLastRow||0})</div>
+      <div class="chips">${(d.lastMachineIds||[]).length?d.lastMachineIds.map(id=>`<span class="chip ${recentIds.includes(id)?'on':''}">${esc(id)}</span>`).join(''):'<span style="color:var(--muted)">ไม่พบข้อมูล</span>'}</div>
+      ${recentIds.length?`<div class="banner ${seenHere.length?'ok':'warn'}" style="margin-top:10px">
+        ${seenHere.length?`✓ พบ ${seenHere.length}/${recentIds.length} รายการล่าสุดที่บันทึกจากเครื่องนี้ในชีตนี้แล้ว — เขียนถูกไฟล์ ถ้าเปิดชีตแล้วไม่เห็น ให้รีเฟรชหน้า Google Sheets`
+                        :`⚠️ ไม่พบรายการล่าสุดที่บันทึกจากเครื่องนี้ในชีตนี้เลย — อาจกำลังเขียนคนละไฟล์กับที่เปิดดูอยู่ ตรวจลิงก์ด้านบนกับแท็บที่เปิดอยู่`}
+      </div>`:''}
+      ${d.executingAs?`<div class="sub" style="margin-top:8px">รันด้วยบัญชี: ${esc(d.executingAs)}</div>`:''}
+    `;
+  }catch(err){
+    $('diagResult').innerHTML=`<div class="banner warn">ตรวจสอบไม่สำเร็จ: ${esc(err.message||err)}</div>`;
+  }
 }
 
 /* ---- datalists ---- */
