@@ -954,6 +954,8 @@ function toggleEdit(id){
   const o=outbox.find(x=>x.id===id); if(!o)return;
   editingId=id;
   editState[id]={
+    machineId:o.rec.machineId, pointCode:o.rec.pointCode, zone:o.rec.zone, zoneName:o.rec.zoneName,
+    num:o.rec.num, typeName:o.rec.typeName, changingMachine:false,
     found:new Set(o.rec.found.map(s=>s.code)),
     repaired:new Set(o.rec.repaired.map(s=>s.code)),
     status:o.rec.status, note:o.rec.note||''
@@ -963,6 +965,11 @@ function toggleEdit(id){
 function editFormHtml(o){
   const st=editState[o.id], foundArr=[...st.found];
   return `<div class="card" style="margin:-4px 0 12px;border-radius:0 0 14px 14px">
+    <div class="mini-label" style="display:flex;justify-content:space-between;align-items:center">
+      <span>เครื่อง: <b>${esc(st.machineId)}</b>${st.machineId!==o.rec.machineId?' <span class="badge zone">เปลี่ยนแล้ว</span>':''}</span>
+      <span class="link" onclick="toggleMachineChange('${o.id}')">${st.changingMachine?'ยกเลิก':'เลือกเครื่องผิด? แก้ตรงนี้'}</span>
+    </div>
+    ${st.changingMachine?machinePickerHtml(o.id,st):''}
     <div class="mini-label">อาการที่พบ</div>
     <div class="chips">${MASTER.symptoms.map(s=>`
       <button class="chip ${st.found.has(s.code)?'on':''}" onclick="editToggleFound('${o.id}','${s.code}')">${esc(s.name)}</button>`).join('')}</div>
@@ -982,6 +989,39 @@ function editFormHtml(o){
     </div>
   </div>`;
 }
+/* compact point→machine picker for correcting "selected the wrong machine from
+   the start" — reuses the same registry data as the main machine picker */
+function machinePickerHtml(id,st){
+  const p=MASTER.points.find(x=>x.code===st.pointCode);
+  return `
+    <div class="field">
+      <label>จุดติดตั้งที่ถูกต้อง</label>
+      <select onchange="editSetPoint('${id}',this.value)">
+        <option value="">— เลือกจุด —</option>
+        ${MASTER.points.map(pt=>`<option value="${esc(pt.code)}" ${pt.code===st.pointCode?'selected':''}>${esc(pt.code)} · ${esc(pt.zname)}${pt.remark?' · '+esc(pt.remark):''}</option>`).join('')}
+      </select>
+    </div>
+    ${p?`<div class="field">
+      <label>เครื่องที่ถูกต้อง</label>
+      <select onchange="editSetMachine('${id}',this.value)">
+        <option value="">— เลือกเครื่อง —</option>
+        ${p.machines.map(m=>`<option value="${esc(m.id)}" ${m.id===st.machineId?'selected':''}>${esc(typeAbbr(m.type))} ${esc(m.num)} · ${esc(m.id)}</option>`).join('')}
+      </select>
+    </div>`:''}
+  `;
+}
+function toggleMachineChange(id){editState[id].changingMachine=!editState[id].changingMachine;renderOutbox()}
+function editSetPoint(id,pointCode){
+  const st=editState[id], p=MASTER.points.find(x=>x.code===pointCode);
+  st.pointCode=pointCode; st.zone=p?p.zone:''; st.zoneName=p?p.zname:''; st.machineId=''; st.num=''; st.typeName='';
+  renderOutbox();
+}
+function editSetMachine(id,machineId){
+  const st=editState[id], p=MASTER.points.find(x=>x.code===st.pointCode);
+  const m=p&&p.machines.find(x=>x.id===machineId); if(!m)return;
+  st.machineId=m.id; st.num=m.num; st.typeName=typeName(m.type);
+  renderOutbox();
+}
 function editToggleFound(id,code){
   const st=editState[id];
   if(st.found.has(code)){st.found.delete(code);st.repaired.delete(code)}else st.found.add(code);
@@ -997,10 +1037,18 @@ function editSetField(id,f,v){editState[id][f]=v}
 function saveEdit(id){
   const o=outbox.find(x=>x.id===id); if(!o)return;
   const st=editState[id];
+  if(!st.machineId){toast('เลือกเครื่องให้ครบ (จุด + เครื่อง)','err');return}
   if(!st.found.size){toast('เลือกอาการที่พบอย่างน้อย 1 อย่าง','err');return}
   const found=[...st.found].map(c=>({code:c,name:symName(c)}));
   const repaired=[...st.repaired].map(c=>({code:c,name:symName(c)}));
   const pending=[...st.found].filter(c=>!st.repaired.has(c)).map(c=>({code:c,name:symName(c)}));
+  const machineChanged=st.machineId!==o.rec.machineId;
+  if(machineChanged){
+    const clash=outbox.some(x=>x.id!==id&&x.rec.machineId===st.machineId&&x.rec.date===o.rec.date);
+    if(clash&&!confirm(`เครื่อง ${st.machineId} มีรายการบันทึกในวันที่นี้อยู่แล้ว (จากรายการอื่น) — ยืนยันเปลี่ยนเป็นเครื่องนี้หรือไม่?`))return;
+  }
+  o.rec.machineId=st.machineId; o.rec.pointCode=st.pointCode; o.rec.zone=st.zone; o.rec.zoneName=st.zoneName;
+  o.rec.num=st.num; o.rec.typeName=st.typeName;
   o.rec.found=found; o.rec.repaired=repaired; o.rec.pending=pending;
   o.rec.status=st.status; o.rec.note=st.note;
   o.status='pending';                         // needs resync — everSynced stays true → routed through api.update
